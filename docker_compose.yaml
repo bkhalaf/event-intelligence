@@ -99,28 +99,3 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  langfuse-db:
-    image: postgres:15
-    container_name: langfuse-db
-    environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse123
-      POSTGRES_DB: langfuse
-    volumes:
-      - langfuse_postgres:/var/lib/postgresql/data
-
-  langfuse:
-    image: langfuse/langfuse:2
-    container_name: langfuse
-    depends_on:
-      - langfuse-db
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://langfuse:langfuse123@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: mysecretkey123456789012345678901234
-      NEXTAUTH_URL: http://localhost:3000
-      SALT: mysaltvalue1234567890123456789012
-
-volumes:
-  langfuse_postgres:
