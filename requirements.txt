@@ -1,0 +1,4 @@
+kafka-python
+fastapi
+uvicorn
+psycopg2-binary
