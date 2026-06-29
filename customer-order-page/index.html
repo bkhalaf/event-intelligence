@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Order Page</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero__content">
+        <p class="eyebrow">Event Intelligence Demo</p>
+        <h1>Customer Order Page</h1>
+        <p class="hero__text">
+          Create a customer order and send it directly to the Kafka pipeline through the FastAPI producer.
+        </p>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <h2>Order Details</h2>
+        <form id="orderForm" class="order-form">
+          <div class="grid">
+            <div class="field">
+              <label for="branch">Branch</label>
+              <select id="branch" name="branch" required>
+                <option value="">Select branch</option>
+                <option value="Gaza">Gaza</option>
+                <option value="Rafah">Rafah</option>
+                <option value="Khan Younis">Khan Younis</option>
+                <option value="Deir al-Balah">Deir al-Balah</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="customer_name">Customer Name</label>
+              <input
+                type="text"
+                id="customer_name"
+                name="customer_name"
+                placeholder="Enter customer name"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label for="payment_method">Payment Method</label>
+              <select id="payment_method" name="payment_method" required>
+                <option value="">Select payment method</option>
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+                <option value="Jawwal Pay">Jawwal Pay</option>
+              </select>
+            </div>
+
+            <div class="field field--full">
+              <label for="notes">Notes</label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows="3"
+                placeholder="Optional notes..."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="products">
+            <div class="products__header">
+              <h3>Select Products</h3>
+              <p>Choose quantity for any items you want to include in the order.</p>
+            </div>
+
+            <div id="productsList" class="products__list"></div>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn--primary">Send Order</button>
+            <button type="button" id="resetBtn" class="btn btn--secondary">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card card--summary">
+        <h2>Order Preview</h2>
+        <div id="orderPreview" class="preview empty">
+          Fill the form to preview the payload before sending.
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Request Result</h2>
+        <div id="resultBox" class="result-box empty">
+          No request sent yet.
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
