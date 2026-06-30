@@ -8,8 +8,8 @@ TOPIC_NAME = sys.argv[1] if len(sys.argv) > 1 else 'output-topic'
 
 # PostgreSQL connection
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5433,
+    'host': 'postgres',
+    'port': 5432,
     'database': 'kafka_events',
     'user': 'admin',
     'password': 'admin123'
@@ -37,7 +37,7 @@ def insert_message(conn, message_data):
 # Create Kafka consumer
 consumer = KafkaConsumer(
     TOPIC_NAME,
-    bootstrap_servers=['localhost:9092'],
+    bootstrap_servers=['kafka:29092'],
     auto_offset_reset='earliest',
     enable_auto_commit=True,
     group_id=f'consumer-{TOPIC_NAME}',

@@ -3,11 +3,10 @@ from pyflink.table import StreamTableEnvironment, EnvironmentSettings
 import time
 import sys
 
-
 def create_kafka_source_ddl():
     return """
     CREATE TABLE kafka_source (
-        `data` ROW<`message` STRING>,
+        data ROW<message STRING>,
         `timestamp` DOUBLE
     ) WITH (
         'connector' = 'kafka',
@@ -16,10 +15,10 @@ def create_kafka_source_ddl():
         'properties.group.id' = 'flink-consumer-group',
         'scan.startup.mode' = 'earliest-offset',
         'format' = 'json',
+        'json.fail-on-missing-field' = 'false',
         'json.ignore-parse-errors' = 'true'
     )
     """
-
 
 def create_kafka_sink_ddl():
     return """
@@ -35,21 +34,20 @@ def create_kafka_sink_ddl():
     )
     """
 
-
 def create_transformation_query():
     return """
     INSERT INTO kafka_sink
     SELECT
-        `data`.`message` AS original_message,
-        UPPER(`data`.`message`) AS transformed_message,
+        data.`message` AS original_message,
+        UPPER(data.`message`) AS transformed_message,
         CURRENT_TIMESTAMP AS processed_at
     FROM kafka_source
+    WHERE data.`message` IS NOT NULL
     """
-    
 
 def main():
     print("Waiting for Kafka to be ready...")
-    time.sleep(30)
+    time.sleep(90)
 
     print("Initializing Flink environment...")
     sys.stdout.flush()
@@ -85,7 +83,6 @@ def main():
         import traceback
         traceback.print_exc()
         raise
-
 
 if __name__ == "__main__":
     main()
