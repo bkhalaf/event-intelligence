@@ -11,7 +11,7 @@ services:
       - "2181:2181"
 
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
     depends_on:
       - zookeeper
@@ -88,7 +88,7 @@ services:
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
   postgres:
-    image: postgres:15
+    image: postgres:16-alpine
     container_name: postgres
     ports:
       - "5433:5432"
