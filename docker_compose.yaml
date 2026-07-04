@@ -60,7 +60,7 @@ services:
     depends_on:
       - kafka
       - postgres
-    command: python consumer.py
+    command: python scripts/consumer.py
     volumes:
       - ./:/app
     restart: on-failure
@@ -126,7 +126,7 @@ services:
       POSTGRES_PASSWORD: admin123
       POSTGRES_DB: kafka_events
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   db-seed:
     build:
@@ -135,6 +135,6 @@ services:
     container_name: db-seed
     depends_on:
       - postgres
-    command: python seed.py
+    command: python scripts/seed.py
     restart: "no"
   
