@@ -26,6 +26,21 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-init
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+      echo 'Waiting for Kafka...' &&
+      sleep 60 &&
+      kafka-topics --create --if-not-exists --topic test-topic --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 &&
+      kafka-topics --create --if-not-exists --topic output-topic --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1
+      "
+    restart: "no"
+    
   producer-api:
     build:
       context: .
@@ -35,6 +50,19 @@ services:
       - kafka
     ports:
       - "5000:5000"
+    restart: on-failure
+
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: consumer
+    depends_on:
+      - kafka
+      - postgres
+    command: python consumer.py
+    volumes:
+      - ./:/app
     restart: on-failure
 
   jobmanager:
@@ -71,6 +99,7 @@ services:
     container_name: flink-job
     depends_on:
       - kafka
+      - kafka-init
       - jobmanager
       - taskmanager
     restart: on-failure
@@ -99,3 +128,13 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  db-seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: db-seed
+    depends_on:
+      - postgres
+    command: python seed.py
+    restart: "no"
+  

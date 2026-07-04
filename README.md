@@ -38,13 +38,20 @@ Cloud-native real-time event streaming pipeline built on Apache Kafka and Apache
                           |   PostgreSQL   |
                           |     :5433      |
                           +----------------+
+                                   ^
+                                   |
+                         +-------------------+
+                         |      db-seed      |
+                         |   (seed.py once)  |
+                         +-------------------+
 ```
 
 ### Data Flow
 
-1. **Ingest** -- The FastAPI producer API receives messages via `POST /send` and publishes them to Kafka's `test-topic`.
+1. **Ingest** -- The FastAPI producer API receives messages via `POST /order` and publishes them to Kafka's `test-topic`.
 2. **Transform** -- An Apache Flink streaming job reads from `test-topic`, transforms each message to uppercase, and writes the result to `output-topic`.
-3. **Store** -- A Python consumer reads from `output-topic` and persists the original and transformed messages to PostgreSQL.
+3. **Store** -- The Dockerized consumer reads from `output-topic` and persists the original and transformed messages to PostgreSQL.
+4. **Seed** -- A startup seed script inserts initial demo records into PostgreSQL so the dashboard has data on first run.
 
 ### Services
 
@@ -58,6 +65,9 @@ Cloud-native real-time event streaming pipeline built on Apache Kafka and Apache
 | Flink Job | Custom (flink-job/Dockerfile) | -- | Stream transformation job |
 | Kafka UI | `provectuslabs/kafka-ui:latest` | 8080 | Kafka topic monitoring |
 | PostgreSQL | `postgres:15` | 5433 | Persistent storage |
+| Kafka Init | Startup helper that creates required Kafka topics | -- | Ensures `test-topic` and `output-topic` exist before Flink starts |
+| Consumer | Custom (Dockerfile) | -- | Reads `output-topic` and writes to PostgreSQL |
+| DB Seed | Custom (Dockerfile) | -- | Inserts initial demo rows once at startup |
 
 ## Prerequisites
 
@@ -73,6 +83,8 @@ docker compose -f docker_compose.yaml up --build -d
 ```
 
 This starts Zookeeper, Kafka, the Producer API, the Flink cluster and job, Kafka UI, and PostgreSQL.
+
+After startup, allow a short warm-up period so Kafka topics are initialized and the Flink job reaches the running state.
 
 ### 2. Verify services are running
 
@@ -126,6 +138,7 @@ docker exec -it postgres psql -U admin -d kafka_events -c "SELECT * FROM kafka_m
 event-intelligence/
 ├── producer.py              # FastAPI producer API
 ├── consumer.py              # Kafka consumer, persists to PostgreSQL
+├── seed.py                  # Inserts initial demo records into PostgreSQL
 ├── Dockerfile               # Producer API container
 ├── docker_compose.yaml      # Full stack orchestration
 ├── init.sql                 # PostgreSQL schema initialization
@@ -133,12 +146,18 @@ event-intelligence/
 ├── flink-job/
 │   ├── flink_job.py         # PyFlink stream transformation job
 │   └── Dockerfile           # Flink job container
+├── customer-order-page/
+│   ├── index.html           # Order page UI
+│   ├── style.css            # Order page styling
+│   ├── script.js            # Order page behavior
+│   └── images/             # Order page assets
 └── LICENSE                  # Apache 2.0
+
 ```
 
 ## API Reference
 
-### `POST /send`
+### `POST /order`
 
 Send a message to the Kafka pipeline.
 
