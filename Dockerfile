@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY producer.py seed.py .
+COPY scripts/producer.py scripts/seed.py ./
 
 EXPOSE 5000
 

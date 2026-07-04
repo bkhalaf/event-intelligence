@@ -60,7 +60,7 @@ services:
     depends_on:
       - kafka
       - postgres
-    command: python consumer.py
+    command: python scripts/consumer.py
     volumes:
       - ./:/app
     restart: on-failure
@@ -135,6 +135,6 @@ services:
     container_name: db-seed
     depends_on:
       - postgres
-    command: python seed.py
+    command: python scripts/seed.py
     restart: "no"
   
