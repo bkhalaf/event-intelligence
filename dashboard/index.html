@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"> 
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Event Intelligence Dashboard</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Event Intelligence Dashboard</h1>
+            <p class="subtitle">
+                Real-Time Order Monitoring System
+            </p>
+            <p id="last-updated">
+                Last Updated:
+            </p>
+        </header>
+        <section class="stats">
+            <div class="card orders-card">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <h3> Orders</h3>
+                <p id="orders">0</p>
+            </div>
+            <div class="card revenue-card">
+                <i class ="fa-solid fa-dollar-sign"></i>
+                <h3> Revenue</h3>
+                <p id="revenue">$0</p>
+            </div>
+            <div class="card products-card">
+                <i class="fa-solid fa-box"></i>
+                <h3> Products</h3>
+                <p id="products">0</p>
+            </div>
+            <div class="card branches-card">
+                <i class="fa-solid fa-store"></i>
+                <h3> Branches</h3>
+                <p id="branches">0</p>
+            </div>
+        </section>
+        <h2 class="section-title">Sales Analytics</h2>
+        <section class="charts">
+
+    <div class="chart-card">
+
+        <h2>Sales by Branch</h2>
+
+        <canvas id="salesChart"></canvas>
+
+    </div>
+
+    <div class="latest-orders-card">
+
+        <h2>Latest Orders</h2>
+
+        <div id="latest-orders">
+            No orders yet
+        </div>
+
+    </div>
+
+</section>
+
+<h2 class="section-title">
+    Branch Performance
+</h2>
+
+<section class="branch-section">
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Branch</th>
+                <th>Orders</th>
+                <th>Revenue</th>
+                <th>Products</th>
+                <th>Average Order</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody id="branch-table">
+
+            <tr>
+
+                <td>---</td>
+                <td>0</td>
+                <td>$0</td>
+                <td>0</td>
+                <td>$0</td>
+
+            </tr>
+
+        </tbody>
+
+    </table>
+
+</section>
+
+    </div>
+
+
+</body>
+
+
+</html>
