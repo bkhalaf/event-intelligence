@@ -5,23 +5,20 @@ async function loadMetrics() {
         const response = await fetch(`${API_BASE_URL}/get_metrics`);
         const data = await response.json();
 
-        document.getElementById("orders").textContent =
-        Number(data.orders).toLocaleString();
+        console.log(data);
 
-        document.getElementById("revenue").textContent =
-        ` $${Number(data.revenue).toLocaleString()}`;
+        document.getElementById("orders").textContent = data.orders;
+        document.getElementById("revenue").textContent = `$${data.revenue}`;
+        document.getElementById("products").textContent = data.products;
+        document.getElementById("branches").textContent = data.branches;
 
-        document.getElementById("products").textContent =
-        Number(data.products).toLocaleString();
+        document.getElementById("last-updated").textContent =
+            `Last Updated: ${data.last_updated}`;
 
-        document.getElementById("branches").textContent =
-        Number(data.branches).toLocaleString();
-
-        } catch (error) {
-            console.error("Error loading metrics:", error);
+    } catch (error) {
+        console.error("Error loading metrics:", error);
     }
 }
-
 let salesChart = null;
 
 async function loadSalesChart() {

@@ -105,11 +105,21 @@ def calculate_metrics(orders):
     total_products = 0
     branches = set()
 
+    last_updated = None
+
     for order in orders:
         branches.add(order["branch"])
+
+        current_time = order["processed_at"] or order["inserted_at"]
+
+        if current_time:
+            if last_updated is None or current_time > last_updated:
+                last_updated = current_time
+
         for item in order["items"]:
             qty = item.get("quantity", 0) or 0
             price = item.get("unit_price", 0) or 0
+
             total_revenue += qty * price
             total_products += qty
 
@@ -118,6 +128,7 @@ def calculate_metrics(orders):
         "revenue": total_revenue,
         "products": total_products,
         "branches": len(branches),
+        "last_updated": last_updated.strftime("%Y-%m-%d %H:%M:%S") if last_updated else "N/A",
     }
 
 def get_latest_orders(orders, limit=10):
