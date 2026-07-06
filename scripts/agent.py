@@ -4,17 +4,24 @@ from kafka import KafkaConsumer
 import psycopg2
 import json
 import requests
+import yaml
+import os
 
-TOPIC_NAME = 'output-topic'
-OLLAMA_URL = 'http://host.docker.internal:11434/api/generate'
-OLLAMA_MODEL = 'llama3'
+# Load config
+config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'agent_config.yaml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+
+TOPIC_NAME = config['kafka']['topic']
+OLLAMA_URL = config['ollama']['url']
+OLLAMA_MODEL = config['ollama']['model']
 
 DB_CONFIG = {
-    'host': 'postgres',
-    'port': 5432,
-    'database': 'kafka_events',
-    'user': 'admin',
-    'password': 'admin123'
+    'host': config['database']['host'],
+    'port': config['database']['port'],
+    'database': config['database']['name'],
+    'user': config['database']['user'],
+    'password': config['database']['password']
 }
 
 def get_db_connection():
@@ -51,14 +58,15 @@ def save_result(conn, original_message, analysis):
 
 consumer = KafkaConsumer(
     TOPIC_NAME,
-    bootstrap_servers=['kafka:29092'],
+    bootstrap_servers=[config['kafka']['bootstrap_servers']],
     auto_offset_reset='earliest',
     enable_auto_commit=True,
-    group_id='agent-consumer',
+    group_id=config['kafka']['group_id'],
     value_deserializer=lambda x: json.loads(x.decode('utf-8'))
 )
 
 print(f"AI Agent started, listening to topic: {TOPIC_NAME}")
+print(f"Using ollama model: {OLLAMA_MODEL}")
 print("Waiting for messages...")
 
 try:
