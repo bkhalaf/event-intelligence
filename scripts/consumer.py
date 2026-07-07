@@ -2,6 +2,8 @@ from kafka import KafkaConsumer
 import psycopg2
 import json
 import sys
+import time
+from kafka.errors import KafkaTimeoutError, KafkaConnectionError
 
 # Get topic name from command line argument, default to 'output-topic'
 TOPIC_NAME = sys.argv[1] if len(sys.argv) > 1 else 'output-topic'
@@ -41,6 +43,7 @@ consumer = KafkaConsumer(
     auto_offset_reset='earliest',
     enable_auto_commit=True,
     group_id=f'consumer-{TOPIC_NAME}',
+    request_timeout_ms=60000,
     value_deserializer=lambda x: json.loads(x.decode('utf-8'))
 )
 
