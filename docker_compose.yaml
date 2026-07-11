@@ -102,7 +102,7 @@ services:
       - kafka-init
       - jobmanager
       - taskmanager
-    restart: on-failure
+    restart: "no"
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
