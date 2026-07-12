@@ -46,8 +46,8 @@ def create_transformation_query():
     """
 
 def main():
-    print("Waiting for Kafka to be ready...")
-    time.sleep(90)
+    #print("Waiting for Kafka to be ready...")
+    #time.sleep(90)
 
     print("Initializing Flink environment...")
     sys.stdout.flush()
