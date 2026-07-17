@@ -7,8 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY scripts ./scripts
 COPY config ./config
-COPY dashboard_utils.py ./
-COPY seed.py ./
+COPY scripts/dashboard_utils.py ./
+COPY scripts/seed.py ./
 
 EXPOSE 5000
 
