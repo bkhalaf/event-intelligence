@@ -4,3 +4,5 @@ uvicorn
 psycopg2-binary
 requests
 pyyaml
+pytest>=7.4
+httpx
