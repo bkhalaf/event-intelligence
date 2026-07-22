@@ -37,6 +37,7 @@ async function loadSalesChart() {
 
         salesChart = new Chart(ctx, {
             type: "pie",
+            cutout: "55%",
             data: {
                 labels: labels,
                 datasets: [{
@@ -54,11 +55,23 @@ async function loadSalesChart() {
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: "bottom"
+                        position: "right",
+                        labels: {
+                            boxWidth: 18,
+                            padding: 15,
+                            font: {
+                                size: 13
+                            }
+                        }
                     }
-                }
+                },
+                layout: {
+                    padding: 20
+                },
+                radius: "85%"
             }
         });
 
@@ -66,6 +79,69 @@ async function loadSalesChart() {
         console.error("Error loading sales chart:", error);
     }
 }
+
+let paymentChart = null;
+
+async function loadPaymentChart() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/sales_by_payment`);
+        const data = await response.json();
+
+        const labels = data.map(item => item.payment_method);
+        const values = data.map(item => item.sales);
+
+        const ctx = document.getElementById("paymentChart").getContext("2d");
+
+        if (paymentChart) {
+            paymentChart.destroy();
+        }
+
+        paymentChart = new Chart(ctx, {
+            type: "doughnut",
+            cutout: "55%",
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: [
+                        "#36A2EB",
+                        "#4BC0C0",
+                        "#FF6384",
+                        "#FFCE56",
+                        "#9966FF",
+                        "#FF9F40"
+                    ],
+                    borderColor: "#ffffff",
+                    borderWidth: 2
+                }]
+            },
+             options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "right",
+                        labels: {
+                            boxWidth: 18,
+                            padding: 15,
+                            font: {
+                                size: 13
+                            }
+                        }
+                    }
+                },
+                layout: {
+                    padding: 20
+                },
+                radius: "85%"
+            }
+        });
+
+    } catch (error) {
+        console.error("Error loading payment chart:", error);
+    }
+}
+
 async function loadBranchPerformance() {
     try {
         const response = await fetch(`${API_BASE_URL}/branch_performance`);
@@ -150,3 +226,4 @@ loadMetrics();
 loadSalesChart();
 loadLatestOrders();
 loadBranchPerformance();
+loadPaymentChart();

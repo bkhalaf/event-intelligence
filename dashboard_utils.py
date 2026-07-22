@@ -178,3 +178,24 @@ def get_branch_performance(orders):
         branch["avg_order"] = round(branch["revenue"] / branch["orders"], 2) if branch["orders"] else 0
 
     return list(stats.values())
+def get_sales_by_payment(orders):
+    result = {}
+
+    for order in orders:
+        payment = order["payment_method"] or "Unknown"
+
+        total = 0
+        for item in order["items"]:
+            qty = item.get("quantity", 0) or 0
+            price = item.get("unit_price", 0) or 0
+            total += qty * price
+
+        result[payment] = result.get(payment, 0) + total
+
+    return [
+        {
+            "payment_method": payment,
+            "sales": sales
+        }
+        for payment, sales in result.items()
+    ]
