@@ -88,9 +88,9 @@ header{
     color:#7c3aed;
 }
 .charts{
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 25px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:25px;
     margin-top: 40px;
     align-items: start;
 }
@@ -345,4 +345,21 @@ canvas{
         padding:10px;
     }
 
+}
+.charts-container{
+    display:flex;
+    gap:24px;
+}
+
+.chart-card{
+    flex:1;
+}
+.chart-card {
+    height: 420px;
+    position: relative;
+}
+
+.chart-card canvas {
+    width: 100% !important;
+    height: 100% !important;
 }

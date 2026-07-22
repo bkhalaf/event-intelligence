@@ -6,6 +6,14 @@ from typing import List, Optional
 import json
 import time
 import traceback
+from dashboard_utils import (
+    fetch_dashboard_data,
+    calculate_metrics,
+    get_latest_orders,
+    get_sales_by_branch,
+    get_branch_performance,
+    get_sales_by_payment
+)
 
 app = FastAPI(
     title="Kafka Producer API",
@@ -141,6 +149,16 @@ def branch_performance():
     try:
         orders = fetch_dashboard_data()
         return get_branch_performance(orders)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+@app.get("/sales_by_payment")
+def sales_by_payment():
+    try:
+         orders = fetch_dashboard_data()
+         return get_sales_by_payment(orders)
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
