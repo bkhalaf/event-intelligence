@@ -149,6 +149,9 @@ Or open the analytics dashboard directly -- see [Frontend Interfaces](#frontend-
 
 ```
 event-intelligence/
+├── backend/
+│   ├── dashboard_utils.py    # Parsing/aggregation logic used by the dashboard endpoints
+│   └── api.py                # FastAPI app: order-creation (Kafka) + dashboard analytics endpoints
 ├── config/
 │   └── agent_config.yaml     # AI provider configuration (active provider + credentials)
 ├── frontend/
@@ -175,8 +178,6 @@ event-intelligence/
 ├── scripts/
 │   ├── agent.py              # AI Agent: consumes output-topic, calls the active AI provider
 │   ├── consumer.py           # Kafka consumer, persists to PostgreSQL
-│   ├── dashboard_utils.py    # Parsing/aggregation logic used by the dashboard endpoints
-│   ├── producer.py           # FastAPI producer API + dashboard endpoints
 │   └── seed.py                # Inserts demo records into PostgreSQL on first run
 ├── sql/
 │   └── init.sql              # PostgreSQL schema (kafka_messages, agent_results)
@@ -195,7 +196,7 @@ event-intelligence/
 
 ## API Reference
 
-All endpoints are served by the Producer API (`scripts/producer.py`) on port `5000`.
+All endpoints are served by the API (`backend/api.py`) on port `5000`.
 
 ### `POST /order`
 
@@ -323,7 +324,7 @@ The project uses `pytest`, split into two categories.
 
 ### Unit tests (29 tests, no infrastructure required)
 
-Cover the pure logic in `dashboard_utils.py`, `producer.py`, and `seed.py`, plus the FastAPI endpoints (Kafka calls are mocked, so these run instantly without Docker):
+Cover the pure logic in `dashboard_utils.py`, `api.py`, and `seed.py`, plus the FastAPI endpoints (Kafka calls are mocked, so these run instantly without Docker):
 
 ```bash
 pytest -v

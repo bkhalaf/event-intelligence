@@ -16,8 +16,8 @@ from dashboard_utils import (
 )
 
 app = FastAPI(
-    title="Kafka Producer API",
-    description="Receive customer orders and send them to Kafka"
+    title="Event Intelligence API",
+    description="Receives customer orders for Kafka and serves dashboard analytics"
 )
 
 app.add_middleware(
@@ -106,15 +106,6 @@ def create_order(order: OrderRequest):
 @app.get("/health")
 def health():
     return {"status": "healthy"}
-
-
-from dashboard_utils import (
-    fetch_dashboard_data,
-    calculate_metrics,
-    get_latest_orders,
-    get_sales_by_branch,
-    get_branch_performance,
-)
 
 
 @app.get("/get_metrics")

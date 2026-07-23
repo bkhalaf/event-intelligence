@@ -1,12 +1,12 @@
-"""Unit tests for producer.py core functions."""
+"""Unit tests for api.py core functions."""
 
 import json
 from unittest.mock import Mock, call, patch
 import pytest
 from fastapi.testclient import TestClient
 from hamcrest import assert_that, equal_to, has_key, instance_of, contains_string
-import producer as service
-from producer import OrderRequest, OrderItem
+import api as service
+from api import OrderRequest, OrderItem
 
 client = TestClient(service.app)
 
@@ -39,7 +39,7 @@ def mock_producer():
 
 @pytest.fixture
 def mock_get_producer():
-    with patch("producer.get_producer") as mock_get:
+    with patch("api.get_producer") as mock_get:
         yield mock_get
 
 
@@ -153,8 +153,8 @@ def test_create_order_failure(sample_order_payload, mock_get_producer, mock_prod
 # --- (Dashboard Endpoints) ---
 
 def test_get_metrics_success():
-    with patch("producer.fetch_dashboard_data") as mock_fetch, \
-         patch("producer.calculate_metrics") as mock_calc:
+    with patch("api.fetch_dashboard_data") as mock_fetch, \
+         patch("api.calculate_metrics") as mock_calc:
         
         mock_fetch.return_value = ["dummy_order"]
         mock_calc.return_value = {"total_sales": 5000}
@@ -169,8 +169,8 @@ def test_get_metrics_success():
 
 
 def test_latest_orders_success():
-    with patch("producer.fetch_dashboard_data") as mock_fetch, \
-         patch("producer.get_latest_orders") as mock_latest:
+    with patch("api.fetch_dashboard_data") as mock_fetch, \
+         patch("api.get_latest_orders") as mock_latest:
         
         mock_fetch.return_value = ["dummy_order"]
         mock_latest.return_value = [{"id": 1}]
@@ -184,8 +184,8 @@ def test_latest_orders_success():
 
 
 def test_sales_branch_success():
-    with patch("producer.fetch_dashboard_data") as mock_fetch, \
-         patch("producer.get_sales_by_branch") as mock_sales:
+    with patch("api.fetch_dashboard_data") as mock_fetch, \
+         patch("api.get_sales_by_branch") as mock_sales:
         
         mock_fetch.return_value = ["dummy_order"]
         mock_sales.return_value = {"Gaza": 1200}
@@ -200,8 +200,8 @@ def test_sales_branch_success():
 
 
 def test_branch_performance_success():
-    with patch("producer.fetch_dashboard_data") as mock_fetch, \
-         patch("producer.get_branch_performance") as mock_perf:
+    with patch("api.fetch_dashboard_data") as mock_fetch, \
+         patch("api.get_branch_performance") as mock_perf:
         
         mock_fetch.return_value = ["dummy_order"]
         mock_perf.return_value = {"Gaza": "High"}

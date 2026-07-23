@@ -1,5 +1,5 @@
 from datetime import datetime
-from scripts.dashboard_utils import parse_items, parse_order, calculate_metrics, get_sales_by_branch, get_branch_performance, get_latest_orders
+from backend.dashboard_utils import parse_items, parse_order, calculate_metrics, get_sales_by_branch, get_branch_performance, get_latest_orders
 
 # ---------- test parse_items ----------
 

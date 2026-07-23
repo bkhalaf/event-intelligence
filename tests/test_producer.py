@@ -1,4 +1,4 @@
-from scripts.producer import build_order_message, OrderRequest, OrderItem
+from backend.api import build_order_message, OrderRequest, OrderItem
 
 
 def test_build_order_message_matches_expected_format():

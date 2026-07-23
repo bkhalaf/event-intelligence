@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
-import scripts.producer as producer_module
-from scripts.producer import app
+import backend.api as producer_module
+from backend.api import app
 
 client = TestClient(app)
 
