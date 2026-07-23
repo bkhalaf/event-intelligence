@@ -40,7 +40,8 @@ services:
       echo 'Waiting for Kafka...' &&
       sleep 60 &&
       kafka-topics --create --if-not-exists --topic test-topic --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 &&
-      kafka-topics --create --if-not-exists --topic output-topic --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1
+      kafka-topics --create --if-not-exists --topic output-topic --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 &&
+      kafka-topics --create --if-not-exists --topic customer-review --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1
       "
     restart: "no"
     
@@ -66,6 +67,20 @@ services:
       - kafka
       - postgres
     command: python scripts/consumer.py
+    volumes:
+      - ./:/app
+    restart: on-failure
+
+  review-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    container_name: review-consumer
+    depends_on:
+      - kafka
+      - postgres
+    command: python scripts/review_consumer.py
     volumes:
       - ./:/app
     restart: on-failure

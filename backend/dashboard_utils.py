@@ -197,3 +197,65 @@ def get_sales_by_payment(orders):
         }
         for payment, sales in result.items()
     ]
+
+def fetch_product_reviews():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT product_id, product_name, customer_name, rating, review_text, submitted_at
+        FROM product_reviews
+        ORDER BY submitted_at DESC
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "product_id": product_id,
+            "product_name": product_name,
+            "customer_name": customer_name,
+            "rating": rating,
+            "review_text": review_text,
+            "submitted_at": submitted_at,
+        }
+        for product_id, product_name, customer_name, rating, review_text, submitted_at in rows
+    ]
+
+def get_product_reviews_summary(reviews, recent_limit=3):
+    stats = {}
+
+    for review in reviews:
+        product_id = review["product_id"]
+        if product_id not in stats:
+            stats[product_id] = {
+                "product_id": product_id,
+                "product_name": review["product_name"],
+                "review_count": 0,
+                "rating_total": 0,
+                "recent_reviews": [],
+            }
+
+        entry = stats[product_id]
+        entry["review_count"] += 1
+        entry["rating_total"] += review["rating"]
+
+        if len(entry["recent_reviews"]) < recent_limit:
+            entry["recent_reviews"].append({
+                "customer_name": review["customer_name"] or "Anonymous",
+                "rating": review["rating"],
+                "review_text": review["review_text"] or "",
+                "submitted_at": review["submitted_at"],
+            })
+
+    summary = []
+    for entry in stats.values():
+        summary.append({
+            "product_id": entry["product_id"],
+            "product_name": entry["product_name"],
+            "review_count": entry["review_count"],
+            "avg_rating": round(entry["rating_total"] / entry["review_count"], 1),
+            "recent_reviews": entry["recent_reviews"],
+        })
+
+    return summary
