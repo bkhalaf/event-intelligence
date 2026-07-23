@@ -1,123 +1,112 @@
 <!DOCTYPE html>
-<html lang="en"> 
+<html lang="en">
 <head>
-
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Event Intelligence Dashboard</title>
-
-    <link rel="stylesheet" href="style.css">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="script.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Event Intelligence</title>
+  <link rel="stylesheet" href="style_2.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-
 <body>
-    <div class="container">
-        <header>
-            <h1>Event Intelligence Dashboard</h1>
-            <p class="subtitle">
-                Real-Time Order Monitoring System
-            </p>
-            <p id="last-updated"></p>
-        </header>
-        <section class="stats">
-            <div class="card orders-card">
-                <i class="fa-solid fa-cart-shopping"></i>
-                <h3> Orders</h3>
-                <p id="orders">0</p>
-            </div>
-            <div class="card revenue-card">
-                <i class ="fa-solid fa-dollar-sign"></i>
-                <h3> Revenue</h3>
-                <p id="revenue">$0</p>
-            </div>
-            <div class="card products-card">
-                <i class="fa-solid fa-box"></i>
-                <h3> Products</h3>
-                <p id="products">0</p>
-            </div>
-            <div class="card branches-card">
-                <i class="fa-solid fa-store"></i>
-                <h3> Branches</h3>
-                <p id="branches">0</p>
-            </div>
-        </section>
-        <h2 class="section-title">Sales Analytics</h2>
-        <section class="charts">
+  <div class="app">
+    <nav class="topbar">
+      <a class="brand" href="index_2.html">
+        <span class="brand__dot"></span>
+        Event Intelligence
+      </a>
+      <div class="topbar__links">
+        <a class="topbar__link" href="../customer-order-page/index_2.html">Order</a>
+        <a class="topbar__link topbar__link--active" href="index_2.html">Dashboard</a>
+        <a class="topbar__link topbar__link--ghost" href="index.html">Classic view</a>
+      </div>
+    </nav>
 
+    <header class="hero">
+      <div class="hero__inner">
+        <p class="eyebrow">Event Intelligence Demo</p>
+        <h1>Real-time order monitoring</h1>
+        <p class="hero__text">Live view of orders, revenue, and branch performance streaming through the pipeline.</p>
+        <div class="hero__pills">
+          <span class="pill pill--live"><span class="dot-live"></span> Live</span>
+          <span class="pill" id="last-updated">Last updated: —</span>
+        </div>
+      </div>
+    </header>
 
-        <div class="chart-card">
-            <h2>Sales by Branch</h2>
-            <canvas id="salesChart"></canvas>
+    <main class="layout">
+      <section class="stats">
+        <div class="stat-card">
+          <div class="stat-card__icon stat-card__icon--orders"><i class="fa-solid fa-cart-shopping"></i></div>
+          <div>
+            <h3>Orders</h3>
+            <p id="orders">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__icon stat-card__icon--revenue"><i class="fa-solid fa-dollar-sign"></i></div>
+          <div>
+            <h3>Revenue</h3>
+            <p id="revenue">$0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__icon stat-card__icon--products"><i class="fa-solid fa-box"></i></div>
+          <div>
+            <h3>Products</h3>
+            <p id="products">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__icon stat-card__icon--branches"><i class="fa-solid fa-store"></i></div>
+          <div>
+            <h3>Branches</h3>
+            <p id="branches">0</p>
+          </div>
+        </div>
+      </section>
+
+      <h2 class="section-title">Sales Analytics</h2>
+      <section class="charts">
+        <div class="card chart-card">
+          <h2 class="card__title">Sales by Branch</h2>
+          <canvas id="salesChart"></canvas>
         </div>
 
-         <div class="chart-card">
-            <h2>Sales by Payment </h2>
-            <canvas id="paymentChart" height="260"></canvas>
+        <div class="card latest-orders-card">
+          <h2 class="card__title">Latest Orders</h2>
+          <div id="latest-orders">No orders yet</div>
         </div>
+      </section>
 
-</div>
-
-<div class="latest-orders-card">
-
-    <h2>Latest Orders</h2>
-
-    <div id="latest-orders">
-        No orders yet
-    </div>
-
-</div>
-
-</section>
-
-<h2 class="section-title">
-    Branch Performance
-</h2>
-
-<section class="branch-section">
-
-    <table>
-
-        <thead>
-
-            <tr>
-
+      <h2 class="section-title">Branch Performance</h2>
+      <section class="card branch-section">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
                 <th>Branch</th>
                 <th>Orders</th>
                 <th>Revenue</th>
                 <th>Products</th>
                 <th>Average Order</th>
-
-            </tr>
-
-        </thead>
-
-        <tbody id="branch-table">
-
-            <tr>
-
+              </tr>
+            </thead>
+            <tbody id="branch-table">
+              <tr>
                 <td>---</td>
                 <td>0</td>
                 <td>$0</td>
                 <td>0</td>
                 <td>$0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
 
-            </tr>
-
-        </tbody>
-
-    </table>
-
-</section>
-
-    </div>
-
-
+  <script src="script_2.js"></script>
 </body>
-
-
 </html>
