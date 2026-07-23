@@ -3,25 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Customer Order Page</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Customer Order — Event Intelligence</title>
+  <link rel="stylesheet" href="style_2.css" />
 </head>
 <body>
-  <div class="page">
+  <div class="app">
+    <nav class="topbar">
+      <a class="brand" href="index_2.html">
+        <span class="brand__dot"></span>
+        Event Intelligence
+      </a>
+      <div class="topbar__links">
+        <a class="topbar__link topbar__link--active" href="index_2.html">Order</a>
+        <a class="topbar__link" href="../dashboard/index_2.html">Dashboard</a>
+        <a class="topbar__link topbar__link--ghost" href="index.html">Classic view</a>
+      </div>
+    </nav>
+
     <header class="hero">
-      <div class="hero__content">
+      <div class="hero__inner">
         <p class="eyebrow">Event Intelligence Demo</p>
-        <h1>Customer Order Page</h1>
+        <h1>Place a new order</h1>
         <p class="hero__text">
-          Create a customer order and send it directly to the Kafka pipeline through the FastAPI producer.
+          Build an order, watch the live payload preview, and send it straight into the Kafka pipeline
+          through the FastAPI producer.
         </p>
+        <div class="hero__pills">
+          <span class="pill">6 products</span>
+          <span class="pill">4 branches</span>
+          <span class="pill">3 payment methods</span>
+        </div>
       </div>
     </header>
 
-    <main class="container">
-      <section class="card">
-        <h2>Order Details</h2>
-        <form id="orderForm" class="order-form">
+    <main class="layout">
+      <section class="col-main">
+        <form id="orderForm" class="card">
+          <h2 class="card__title">Order details</h2>
           <div class="grid">
             <div class="field">
               <label for="branch">Branch</label>
@@ -35,7 +53,7 @@
             </div>
 
             <div class="field">
-              <label for="customer_name">Customer Name</label>
+              <label for="customer_name">Customer name</label>
               <input
                 type="text"
                 id="customer_name"
@@ -46,7 +64,7 @@
             </div>
 
             <div class="field">
-              <label for="payment_method">Payment Method</label>
+              <label for="payment_method">Payment method</label>
               <select id="payment_method" name="payment_method" required>
                 <option value="">Select payment method</option>
                 <option value="Cash">Cash</option>
@@ -65,39 +83,41 @@
               ></textarea>
             </div>
           </div>
+        </form>
 
-          <div class="products">
-            <div class="products__header">
-              <h3>Select Products</h3>
-              <p>Choose quantity for any items you want to include in the order.</p>
-            </div>
+        <div class="card">
+          <div class="products__header">
+            <h2 class="card__title">Select products</h2>
+            <p>Use the stepper to set a quantity for any item you'd like to include.</p>
+          </div>
+          <div id="productsList" class="products__list"></div>
+        </div>
+      </section>
 
-            <div id="productsList" class="products__list"></div>
+      <aside class="col-side">
+        <div class="cart card">
+          <h2 class="card__title">Order summary</h2>
+          <div id="cartItems" class="cart__items empty">
+            No items selected yet.
+          </div>
+          <div class="cart__total">
+            <span>Total</span>
+            <strong id="cartTotal">0.00 ILS</strong>
           </div>
 
           <div class="actions">
-            <button type="submit" class="btn btn--primary">Send Order</button>
+            <button type="submit" form="orderForm" class="btn btn--primary">Send order</button>
             <button type="button" id="resetBtn" class="btn btn--secondary">Reset</button>
           </div>
-        </form>
-      </section>
 
-      <section class="card card--summary">
-        <h2>Order Preview</h2>
-        <div id="orderPreview" class="preview empty">
-          Fill the form to preview the payload before sending.
+          <div id="resultBox" class="result-box empty">
+            No request sent yet.
+          </div>
         </div>
-      </section>
-
-      <section class="card">
-        <h2>Request Result</h2>
-        <div id="resultBox" class="result-box empty">
-          No request sent yet.
-        </div>
-      </section>
+      </aside>
     </main>
   </div>
 
-  <script src="script.js"></script>
+  <script src="script_2.js"></script>
 </body>
 </html>
