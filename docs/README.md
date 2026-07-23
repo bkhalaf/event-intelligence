@@ -54,7 +54,7 @@ Cloud-native real-time event streaming pipeline built on Apache Kafka and Apache
 2. **Transform** -- An Apache Flink (PyFlink) streaming job reads from `test-topic`, transforms each message to uppercase, and writes the result to `output-topic`.
 3. **Store** -- The Dockerized consumer reads from `output-topic` and persists the original and transformed messages to PostgreSQL.
 4. **Analyze** -- The AI Agent reads from `output-topic` in parallel with the consumer, analyzes each order using a configurable AI provider (Gemini, Groq, Ollama, or OpenAI -- selected via `config/agent_config.yaml`), with automatic retry and exponential backoff, and persists the analysis to PostgreSQL's `agent_results` table.
-5. **Serve** -- The analytics dashboard (`dashboard/`) reads aggregated metrics from the Producer API and displays them in real time. A separate customer-facing order page (`customer-order-page/`) lets users submit new orders directly to the pipeline.
+5. **Serve** -- The analytics dashboard (`frontend/dashboard-page/`) reads aggregated metrics from the Producer API and displays them in real time. A separate customer-facing order page (`frontend/order-page/`) lets users submit new orders directly to the pipeline.
 6. **Seed** -- A startup seed script inserts initial demo records into PostgreSQL (only if the table is empty) so the dashboard has data on first run.
 
 ### Services
@@ -151,15 +151,21 @@ Or open the analytics dashboard directly -- see [Frontend Interfaces](#frontend-
 event-intelligence/
 ├── config/
 │   └── agent_config.yaml     # AI provider configuration (active provider + credentials)
-├── customer-order-page/
-│   ├── images/
-│   ├── index.html
-│   ├── script.js
-│   └── style.css
-├── dashboard/                 # Static real-time analytics dashboard
-│   ├── index.html
-│   ├── script.js
-│   └── style.css
+├── frontend/
+│   ├── dashboard-page/         # Static real-time analytics dashboard
+│   │   ├── index.html
+│   │   ├── script.js
+│   │   └── style.css
+│   ├── order-page/
+│   │   ├── images/
+│   │   ├── index.html
+│   │   ├── script.js
+│   │   └── style.css
+│   └── store-page/
+│       ├── images/
+│       ├── index.html
+│       ├── script.js
+│       └── style.css
 ├── docs/
 │   ├── INFRASTRUCTURE.md     # Infrastructure decisions & benchmarking notes
 │   └── README.md             
@@ -299,7 +305,7 @@ docker exec -it postgres psql -U admin -d kafka_events -c "SELECT * FROM agent_r
 
 The project includes two independent static front-ends, both plain HTML/CSS/JS (no build step) and both calling the Producer API directly at `http://localhost:5000`.
 
-### `dashboard/` -- Analytics Dashboard
+### `frontend/dashboard-page/` -- Analytics Dashboard
 
 A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales_branch`, `/latest_orders`, and `/branch_performance`, and renders:
 - Summary cards (total orders, revenue, products, branches)
@@ -307,7 +313,7 @@ A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales
 - A live feed of the most recent orders
 - A branch-performance comparison table
 
-### `customer-order-page/` -- Order Submission Page
+### `frontend/order-page/` -- Order Submission Page
 
 A simple customer-facing form for placing new orders. It lets a user pick a branch, payment method, and product quantities, previews the JSON payload before sending, and submits it via `POST /order`.
 
