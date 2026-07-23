@@ -1,21 +1,24 @@
+import os
 import time
 import uuid
 
 import psycopg2
 import pytest
 import requests
+import yaml
 
 pytestmark = pytest.mark.integration
 
 API_URL = "http://localhost:5000"
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5433,
-    "dbname": "kafka_events",
-    "user": "admin",
-    "password": "admin123",
-}
+DB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
+with open(DB_CONFIG_PATH, 'r') as f:
+    DB_CONFIG = yaml.safe_load(f)
+
+# Tests run on the host machine, outside the Docker network, so they reach
+# Postgres via its published port rather than the internal "postgres" hostname.
+DB_CONFIG["host"] = "localhost"
+DB_CONFIG["port"] = 5433
 
 
 def _wait_for_message(marker, timeout=30, interval=2):

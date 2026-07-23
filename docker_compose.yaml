@@ -132,6 +132,7 @@ services:
     ports:
       - "5433:5432"
     environment:
+      # Keep in sync with config/postgres_db_config.yaml (Compose can't read that file directly)
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin123
       POSTGRES_DB: kafka_events

@@ -2,18 +2,16 @@ from kafka import KafkaConsumer
 import psycopg2
 import json
 import sys
+import os
+import yaml
 
 # Get topic name from command line argument, default to 'output-topic'
 TOPIC_NAME = sys.argv[1] if len(sys.argv) > 1 else 'output-topic'
 
 # PostgreSQL connection
-DB_CONFIG = {
-    'host': 'postgres',
-    'port': 5432,
-    'database': 'kafka_events',
-    'user': 'admin',
-    'password': 'admin123'
-}
+DB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
+with open(DB_CONFIG_PATH, 'r') as f:
+    DB_CONFIG = yaml.safe_load(f)
 
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)

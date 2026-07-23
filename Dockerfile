@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app/backend
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -8,7 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY scripts ./scripts
 COPY backend ./backend
 COPY config ./config
-COPY backend/dashboard_utils.py ./
 COPY scripts/seed.py ./
 
 EXPOSE 5000

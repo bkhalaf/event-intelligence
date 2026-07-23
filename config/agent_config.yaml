@@ -24,10 +24,3 @@ kafka:
   topic: "output-topic"
   bootstrap_servers: "kafka:29092"
   group_id: "agent-consumer"
-
-database:
-  host: "postgres"
-  port: 5432
-  name: "kafka_events"
-  user: "admin"
-  password: "admin123"

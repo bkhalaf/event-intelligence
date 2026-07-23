@@ -1,14 +1,12 @@
 import json
 import psycopg2
 import re
+import os
+import yaml
 
-DB_CONFIG = {
-    "host": "postgres",
-    "port": 5432,
-    "dbname": "kafka_events",
-    "user": "admin",
-    "password": "admin123",
-}
+DB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
+with open(DB_CONFIG_PATH, 'r') as f:
+    DB_CONFIG = yaml.safe_load(f)
 
 PRODUCT_PRICES = {
     "Anker Power Bank": 120,
