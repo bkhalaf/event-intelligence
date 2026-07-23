@@ -222,8 +222,13 @@ async function loadLatestOrders() {
         console.error("Error loading latest orders:", error);
     }
 }
-loadMetrics();
-loadSalesChart();
-loadLatestOrders();
-loadBranchPerformance();
-loadPaymentChart();
+function refreshAll() {
+    loadMetrics();
+    loadSalesChart();
+    loadLatestOrders();
+    loadBranchPerformance();
+    loadPaymentChart();
+}
+
+refreshAll();
+setInterval(refreshAll, 1000);
