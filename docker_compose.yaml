@@ -3,6 +3,7 @@ version: '3.8'
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
+    platform: linux/amd64
     container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -12,6 +13,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.6.0
+    platform: linux/amd64
     container_name: kafka
     depends_on:
       - zookeeper
@@ -28,6 +30,7 @@ services:
 
   kafka-init:
     image: confluentinc/cp-kafka:7.5.0
+    platform: linux/amd64
     container_name: kafka-init
     depends_on:
       - kafka
@@ -45,6 +48,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: producer-api
     depends_on:
       - kafka
@@ -56,6 +60,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: consumer
     depends_on:
       - kafka
@@ -67,6 +72,7 @@ services:
 
   jobmanager:
     image: flink:1.18-java11
+    platform: linux/amd64
     container_name: jobmanager
     ports:
       - "8081:8081"
@@ -80,6 +86,7 @@ services:
 
   taskmanager:
     image: flink:1.18-java11
+    platform: linux/amd64
     container_name: taskmanager
     depends_on:
       - jobmanager
@@ -96,6 +103,7 @@ services:
     build:
       context: ./flink-job
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: flink-job
     depends_on:
       - kafka
@@ -106,6 +114,7 @@ services:
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
+    platform: linux/amd64
     container_name: kafka-ui
     depends_on:
       - kafka
@@ -118,6 +127,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    platform: linux/amd64
     container_name: postgres
     ports:
       - "5433:5432"
@@ -132,6 +142,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: db-seed
     depends_on:
       - postgres
@@ -142,6 +153,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: agent
     depends_on:
       - kafka
