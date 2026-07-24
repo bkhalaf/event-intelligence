@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5050";
+const API_BASE_URL = "http://localhost:5000";
 
 async function loadMetrics() {
     try {

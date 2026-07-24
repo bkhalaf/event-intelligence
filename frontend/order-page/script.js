@@ -177,7 +177,7 @@ async function submitOrder(event) {
   resultBox.textContent = "Sending order...";
 
   try {
-    const response = await fetch("http://localhost:5050/order", {
+    const response = await fetch("http://localhost:5000/order", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
