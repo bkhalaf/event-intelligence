@@ -12,3 +12,13 @@ CREATE TABLE IF NOT EXISTS agent_results (
     agent_analysis TEXT,
     analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id SERIAL PRIMARY KEY,
+    product_id TEXT NOT NULL,
+    product_name TEXT NOT NULL,
+    customer_name TEXT,
+    rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    review_text TEXT,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

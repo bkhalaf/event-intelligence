@@ -6,56 +6,94 @@ Cloud-native real-time event streaming pipeline built on Apache Kafka and Apache
 
 ## Architecture
 
-```
-                         +-------------------+
-                         |   Producer API    |
-                         |  (FastAPI :5000)  |
-                         +---------+---------+
-                                   |
-                                   v
-+-------------+         +-------------------+         +-------------------+
-|  Zookeeper  |<------->|      Kafka        |<------->|    Kafka UI       |
-|    :2181    |         |   :9092 / :29092  |         |     :8080         |
-+-------------+         +---------+---------+         +-------------------+
-                                   |
-                                   | test-topic
-                                   v
-                         +-------------------+
-                         |    Flink Job      |
-                         | (JobManager :8081)|
-                         | (TaskManager)     |
-                         +---------+---------+
-                                   |
-                                   | output-topic (transformed)
-                                   v
-             +-------------------+     +---------------------------+
-             |    Consumer       |     |         AI Agent          |
-             | (Python script)   |     | (configurable provider:   |
-             +---------+---------+     |  Gemini / Groq / Ollama / |
-                       |               |  OpenAI via YAML config)  |
-                       |               +-------------+-------------+
-                       v                             |
-                +----------------+                   |
-                |   PostgreSQL   |<------------------+
-                |     :5433      |
-                +----------------+
-                       ^
-                       |
-        +-------------------+           +-------------------+
-        |      db-seed      |           |     Dashboard      |
-        |   (seed.py once)  |           | (reads /get_metrics,|
-        +-------------------+           |  /sales_branch, ...) |
-                                        +-------------------+
+```mermaid
+flowchart TD
+    subgraph FE["🖥️ Frontend (static HTML/JS)"]
+        ORDERPAGE["Order Page"]
+        STOREPAGE["Store Page"]
+        DASH["Dashboard"]
+    end
+
+    subgraph API["⚙️ Backend API — FastAPI :5000 (backend/api.py)"]
+        POSTORDER["POST /order"]
+        POSTREVIEW["POST /review"]
+        GETDASH["GET /get_metrics, /sales_branch, ..."]
+        GETREVIEWS["GET /product_reviews_summary"]
+    end
+
+    subgraph KAFKA["📨 Kafka Cluster"]
+        ZK["Zookeeper :2181"]
+        BROKER["Kafka Broker :9092 / :29092"]
+        TESTTOPIC["test-topic"]
+        OUTPUTTOPIC["output-topic"]
+        REVIEWTOPIC["customer-review"]
+        KUI["Kafka UI :8080"]
+    end
+
+    subgraph FLINK["🌀 Flink (PyFlink)"]
+        FLINKJOB["Flink Job — uppercase transform<br/>JobManager :8081 / TaskManager"]
+    end
+
+    subgraph CONSUMERS["🐍 Consumers"]
+        CONSUMER["consumer.py"]
+        AGENT["AI Agent<br/>Gemini / Groq / Ollama / OpenAI"]
+        REVIEWCONSUMER["review_consumer.py"]
+    end
+
+    subgraph DB["🗄️ PostgreSQL :5433"]
+        KMSG[("kafka_messages")]
+        AREZ[("agent_results")]
+        PREV[("product_reviews")]
+    end
+
+    ORDERPAGE -->|submit order| POSTORDER
+    STOREPAGE -->|submit review| POSTREVIEW
+    STOREPAGE -->|fetch summary| GETREVIEWS
+    DASH -->|fetch analytics| GETDASH
+
+    POSTORDER --> TESTTOPIC
+    POSTREVIEW --> REVIEWTOPIC
+
+    ZK <--> BROKER
+    BROKER --- TESTTOPIC
+    BROKER --- OUTPUTTOPIC
+    BROKER --- REVIEWTOPIC
+    BROKER --- KUI
+
+    TESTTOPIC --> FLINKJOB --> OUTPUTTOPIC
+
+    OUTPUTTOPIC --> CONSUMER --> KMSG
+    OUTPUTTOPIC --> AGENT --> AREZ
+    REVIEWTOPIC --> REVIEWCONSUMER --> PREV
+
+    KMSG --> GETDASH
+    AREZ -.-> GETDASH
+    PREV --> GETREVIEWS
+
+    classDef frontend fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:2px;
+    classDef api fill:#ede9fe,stroke:#7c3aed,color:#4c1d95,stroke-width:2px;
+    classDef kafka fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
+    classDef flink fill:#fce7f3,stroke:#db2777,color:#831843,stroke-width:2px;
+    classDef consumer fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px;
+    classDef db fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:2px;
+
+    class ORDERPAGE,STOREPAGE,DASH frontend;
+    class POSTORDER,POSTREVIEW,GETDASH,GETREVIEWS api;
+    class ZK,BROKER,TESTTOPIC,OUTPUTTOPIC,REVIEWTOPIC,KUI kafka;
+    class FLINKJOB flink;
+    class CONSUMER,AGENT,REVIEWCONSUMER consumer;
+    class KMSG,AREZ,PREV db;
 ```
 
 ### Data Flow
 
-1. **Ingest** -- The FastAPI producer API receives orders via `POST /order` and publishes them to Kafka's `test-topic`.
+1. **Ingest** -- The FastAPI backend receives orders via `POST /order` and publishes them to Kafka's `test-topic`.
 2. **Transform** -- An Apache Flink (PyFlink) streaming job reads from `test-topic`, transforms each message to uppercase, and writes the result to `output-topic`.
 3. **Store** -- The Dockerized consumer reads from `output-topic` and persists the original and transformed messages to PostgreSQL.
 4. **Analyze** -- The AI Agent reads from `output-topic` in parallel with the consumer, analyzes each order using a configurable AI provider (Gemini, Groq, Ollama, or OpenAI -- selected via `config/agent_config.yaml`), with automatic retry and exponential backoff, and persists the analysis to PostgreSQL's `agent_results` table.
-5. **Serve** -- The analytics dashboard (`dashboard/`) reads aggregated metrics from the Producer API and displays them in real time. A separate customer-facing order page (`customer-order-page/`) lets users submit new orders directly to the pipeline.
-6. **Seed** -- A startup seed script inserts initial demo records into PostgreSQL (only if the table is empty) so the dashboard has data on first run.
+5. **Review** -- The store page lets customers submit a star rating and text review via `POST /review`, which publishes directly (no Flink transform) to the `customer-review` topic. A dedicated `review-consumer` persists each review to PostgreSQL's `product_reviews` table.
+6. **Serve** -- The analytics dashboard (`frontend/dashboard-page/`) reads aggregated metrics from the backend and displays them in real time. The order page (`frontend/order-page/`) lets users submit new orders, and the store page (`frontend/store-page/`) lets users submit and browse product reviews.
+7. **Seed** -- A startup seed script inserts initial demo records into PostgreSQL (only if the table is empty) so the dashboard has data on first run.
 
 ### Services
 
@@ -63,8 +101,8 @@ Cloud-native real-time event streaming pipeline built on Apache Kafka and Apache
 |---|---|---|---|
 | Zookeeper | `confluentinc/cp-zookeeper:7.5.0` | 2181 | Kafka coordination |
 | Kafka | `confluentinc/cp-kafka:7.6.0` | 9092, 29092 | Message broker |
-| Kafka Init | `confluentinc/cp-kafka:7.5.0` (startup helper) | -- | One-time job that creates `test-topic` and `output-topic` before Flink starts |
-| Producer API | Custom (`Dockerfile`) | 5000 | FastAPI REST API: receives orders, exposes dashboard metrics endpoints |
+| Kafka Init | `confluentinc/cp-kafka:7.5.0` (startup helper) | -- | One-time job that creates `test-topic`, `output-topic`, and `customer-review` before Flink starts |
+| Producer API | Custom (`Dockerfile`) | 5000 | FastAPI REST API (`backend/api.py`): receives orders/reviews, exposes dashboard + review-summary endpoints |
 | Flink JobManager | `flink:1.18-java11` | 8081 | Flink cluster coordinator |
 | Flink TaskManager | `flink:1.18-java11` | -- | Flink task execution (2 task slots) |
 | Flink Job | Custom (`flink-job/Dockerfile`) | -- | PyFlink stream transformation job |
@@ -72,6 +110,7 @@ Cloud-native real-time event streaming pipeline built on Apache Kafka and Apache
 | PostgreSQL | `postgres:16-alpine` | 5433 → 5432 | Persistent storage |
 | Consumer | Custom (`Dockerfile`) | -- | Reads `output-topic`, writes raw + transformed messages to PostgreSQL |
 | AI Agent | Custom (`Dockerfile`) | -- | Reads `output-topic`, analyzes orders via the configured AI provider, stores results in PostgreSQL |
+| Review Consumer | Custom (`Dockerfile`) | -- | Reads `customer-review`, writes ratings + review text to PostgreSQL's `product_reviews` table |
 | DB Seed | Custom (`Dockerfile`) | -- | Inserts demo rows once at startup, only if the table is empty |
 
 ## Prerequisites
@@ -149,17 +188,26 @@ Or open the analytics dashboard directly -- see [Frontend Interfaces](#frontend-
 
 ```
 event-intelligence/
+├── backend/
+│   ├── dashboard_utils.py    # Parsing/aggregation logic used by the dashboard endpoints
+│   └── api.py                # FastAPI app: order-creation (Kafka) + dashboard analytics endpoints
 ├── config/
 │   └── agent_config.yaml     # AI provider configuration (active provider + credentials)
-├── customer-order-page/
-│   ├── images/
-│   ├── index.html
-│   ├── script.js
-│   └── style.css
-├── dashboard/                 # Static real-time analytics dashboard
-│   ├── index.html
-│   ├── script.js
-│   └── style.css
+├── frontend/
+│   ├── dashboard-page/         # Static real-time analytics dashboard
+│   │   ├── index.html
+│   │   ├── script.js
+│   │   └── style.css
+│   ├── order-page/
+│   │   ├── images/
+│   │   ├── index.html
+│   │   ├── script.js
+│   │   └── style.css
+│   └── store-page/
+│       ├── images/
+│       ├── index.html
+│       ├── script.js
+│       └── style.css
 ├── docs/
 │   ├── INFRASTRUCTURE.md     # Infrastructure decisions & benchmarking notes
 │   └── README.md             
@@ -169,8 +217,6 @@ event-intelligence/
 ├── scripts/
 │   ├── agent.py              # AI Agent: consumes output-topic, calls the active AI provider
 │   ├── consumer.py           # Kafka consumer, persists to PostgreSQL
-│   ├── dashboard_utils.py    # Parsing/aggregation logic used by the dashboard endpoints
-│   ├── producer.py           # FastAPI producer API + dashboard endpoints
 │   └── seed.py                # Inserts demo records into PostgreSQL on first run
 ├── sql/
 │   └── init.sql              # PostgreSQL schema (kafka_messages, agent_results)
@@ -189,7 +235,7 @@ event-intelligence/
 
 ## API Reference
 
-All endpoints are served by the Producer API (`scripts/producer.py`) on port `5000`.
+All endpoints are served by the API (`backend/api.py`) on port `5000`.
 
 ### `POST /order`
 
@@ -299,7 +345,7 @@ docker exec -it postgres psql -U admin -d kafka_events -c "SELECT * FROM agent_r
 
 The project includes two independent static front-ends, both plain HTML/CSS/JS (no build step) and both calling the Producer API directly at `http://localhost:5000`.
 
-### `dashboard/` -- Analytics Dashboard
+### `frontend/dashboard-page/` -- Analytics Dashboard
 
 A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales_branch`, `/latest_orders`, and `/branch_performance`, and renders:
 - Summary cards (total orders, revenue, products, branches)
@@ -307,7 +353,7 @@ A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales
 - A live feed of the most recent orders
 - A branch-performance comparison table
 
-### `customer-order-page/` -- Order Submission Page
+### `frontend/order-page/` -- Order Submission Page
 
 A simple customer-facing form for placing new orders. It lets a user pick a branch, payment method, and product quantities, previews the JSON payload before sending, and submits it via `POST /order`.
 
@@ -317,7 +363,7 @@ The project uses `pytest`, split into two categories.
 
 ### Unit tests (29 tests, no infrastructure required)
 
-Cover the pure logic in `dashboard_utils.py`, `producer.py`, and `seed.py`, plus the FastAPI endpoints (Kafka calls are mocked, so these run instantly without Docker):
+Cover the pure logic in `dashboard_utils.py`, `api.py`, and `seed.py`, plus the FastAPI endpoints (Kafka calls are mocked, so these run instantly without Docker):
 
 ```bash
 pytest -v

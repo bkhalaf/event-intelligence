@@ -39,7 +39,8 @@ const products = [
 
 const productsList = document.getElementById("productsList");
 const orderForm = document.getElementById("orderForm");
-const orderPreview = document.getElementById("orderPreview");
+const cartItems = document.getElementById("cartItems");
+const cartTotal = document.getElementById("cartTotal");
 const resultBox = document.getElementById("resultBox");
 const resetBtn = document.getElementById("resetBtn");
 
@@ -47,32 +48,54 @@ function renderProducts() {
   productsList.innerHTML = products
     .map(
       (product) => `
-        <div class="product-card">
+        <div class="product-card" id="card-${product.product_id}">
           <img
             src="${product.image}"
             alt="${product.product_name}"
             class="product-image"
           />
           <h4>${product.product_name}</h4>
-          <div class="product-meta">
-            Product ID: ${product.product_id}<br />
-            Unit Price: ${product.unit_price.toFixed(2)} ILS
-          </div>
+          <div class="product-meta">Product ID: ${product.product_id}</div>
           <div class="product-controls">
-            <label for="qty-${product.product_id}">Qty</label>
-            <input
-              type="number"
-              id="qty-${product.product_id}"
-              min="0"
-              value="0"
-              data-product-id="${product.product_id}"
-            />
+            <span class="product-price">${product.unit_price.toFixed(2)} ILS</span>
+            <div class="stepper">
+              <button type="button" data-action="dec" data-product-id="${product.product_id}" aria-label="Decrease quantity">&minus;</button>
+              <input
+                type="number"
+                id="qty-${product.product_id}"
+                min="0"
+                value="0"
+                readonly
+                data-product-id="${product.product_id}"
+              />
+              <button type="button" data-action="inc" data-product-id="${product.product_id}" aria-label="Increase quantity">+</button>
+            </div>
           </div>
         </div>
       `
     )
     .join("");
 }
+
+function setQuantity(productId, quantity) {
+  const qtyInput = document.getElementById(`qty-${productId}`);
+  const card = document.getElementById(`card-${productId}`);
+  const value = Math.max(0, quantity);
+  qtyInput.value = value;
+  card.classList.toggle("is-selected", value > 0);
+  updateCart();
+}
+
+productsList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const productId = button.dataset.productId;
+  const qtyInput = document.getElementById(`qty-${productId}`);
+  const current = Number(qtyInput.value) || 0;
+  const next = button.dataset.action === "inc" ? current + 1 : current - 1;
+  setQuantity(productId, next);
+});
 
 function getSelectedItems() {
   return products
@@ -104,23 +127,33 @@ function buildPayload() {
   };
 }
 
-function updatePreview() {
-  const payload = buildPayload();
-  const hasBasicData =
-    payload.branch ||
-    payload.customer_name ||
-    payload.payment_method ||
-    payload.notes ||
-    payload.items.length > 0;
+function updateCart() {
+  const items = getSelectedItems();
 
-  if (!hasBasicData) {
-    orderPreview.className = "preview empty";
-    orderPreview.textContent = "Fill the form to preview the payload before sending.";
+  if (items.length === 0) {
+    cartItems.className = "cart__items empty";
+    cartItems.textContent = "No items selected yet.";
+    cartTotal.textContent = "0.00 ILS";
     return;
   }
 
-  orderPreview.className = "preview";
-  orderPreview.textContent = JSON.stringify(payload, null, 2);
+  cartItems.className = "cart__items";
+  cartItems.innerHTML = items
+    .map(
+      (item) => `
+        <div class="cart-row">
+          <div>
+            <div class="cart-row__name">${item.product_name}</div>
+            <div class="cart-row__qty">Qty ${item.quantity} &times; ${item.unit_price.toFixed(2)} ILS</div>
+          </div>
+          <div class="cart-row__price">${(item.quantity * item.unit_price).toFixed(2)} ILS</div>
+        </div>
+      `
+    )
+    .join("");
+
+  const total = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  cartTotal.textContent = `${total.toFixed(2)} ILS`;
 }
 
 async function submitOrder(event) {
@@ -169,20 +202,15 @@ async function submitOrder(event) {
 function resetForm() {
   orderForm.reset();
   products.forEach((product) => {
-    const qtyInput = document.getElementById(`qty-${product.product_id}`);
-    if (qtyInput) qtyInput.value = 0;
+    setQuantity(product.product_id, 0);
   });
-
-  orderPreview.className = "preview empty";
-  orderPreview.textContent = "Fill the form to preview the payload before sending.";
 
   resultBox.className = "result-box empty";
   resultBox.textContent = "No request sent yet.";
 }
 
 renderProducts();
-updatePreview();
+updateCart();
 
-orderForm.addEventListener("input", updatePreview);
 orderForm.addEventListener("submit", submitOrder);
 resetBtn.addEventListener("click", resetForm);

@@ -1,8 +1,8 @@
-kafka-python
-fastapi
-uvicorn
-psycopg2-binary
-requests
-pyyaml
-pytest>=7.4
-httpx
+kafka-python==3.0.9
+fastapi==0.139.2
+uvicorn==0.51.0
+psycopg2-binary==2.9.12
+requests==2.34.2
+pyyaml==6.0.3
+pytest==9.1.1
+httpx==0.28.1

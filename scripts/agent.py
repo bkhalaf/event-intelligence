@@ -18,13 +18,9 @@ TOPIC_NAME = config['kafka']['topic']
 ACTIVE_PROVIDER = config['active_provider']
 PROVIDER_CONFIG = config['providers'][ACTIVE_PROVIDER]
 
-DB_CONFIG = {
-    'host': config['database']['host'],
-    'port': config['database']['port'],
-    'database': config['database']['name'],
-    'user': config['database']['user'],
-    'password': config['database']['password']
-}
+db_config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
+with open(db_config_path, 'r') as f:
+    DB_CONFIG = yaml.safe_load(f)
 
 
 def get_db_connection():

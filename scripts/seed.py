@@ -1,15 +1,13 @@
 import time
 import psycopg2
 import random
+import os
+import yaml
 from datetime import datetime, timedelta
 
-DB_CONFIG = {
-    "host": "postgres",
-    "port": 5432,
-    "database": "kafka_events",
-    "user": "admin",
-    "password": "admin123"
-}
+DB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
+with open(DB_CONFIG_PATH, 'r') as f:
+    DB_CONFIG = yaml.safe_load(f)
 
 CUSTOMERS = ["Ahmad", "Sara", "Lina", "Omar", "Noor", "Malak", "Yousef", "Maha"]
 BRANCHES = ["Gaza", "Rafah", "Khan Younis", "Deir al-Balah"]

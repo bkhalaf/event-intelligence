@@ -5,8 +5,8 @@ import sys
 import os
 import yaml
 
-# Get topic name from command line argument, default to 'output-topic'
-TOPIC_NAME = sys.argv[1] if len(sys.argv) > 1 else 'output-topic'
+# Get topic name from command line argument, default to 'customer-review'
+TOPIC_NAME = sys.argv[1] if len(sys.argv) > 1 else 'customer-review'
 
 # PostgreSQL connection
 DB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
@@ -16,17 +16,19 @@ with open(DB_CONFIG_PATH, 'r') as f:
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
-def insert_message(conn, message_data):
+def insert_review(conn, review_data):
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO kafka_messages (original_message, transformed_message, processed_at)
-        VALUES (%s, %s, %s)
+        INSERT INTO product_reviews (product_id, product_name, customer_name, rating, review_text)
+        VALUES (%s, %s, %s, %s, %s)
         """,
         (
-            message_data.get('original_message'),
-            message_data.get('transformed_message'),
-            message_data.get('processed_at'),
+            review_data.get('product_id'),
+            review_data.get('product_name'),
+            review_data.get('customer_name'),
+            review_data.get('rating'),
+            review_data.get('review_text'),
         )
     )
     conn.commit()
@@ -42,7 +44,7 @@ consumer = KafkaConsumer(
     value_deserializer=lambda x: json.loads(x.decode('utf-8'))
 )
 
-print(f"Starting consumer, listening to topic: {TOPIC_NAME}")
+print(f"Starting review consumer, listening to topic: {TOPIC_NAME}")
 print("Waiting for messages... (Press Ctrl+C to stop)")
 
 try:
@@ -54,7 +56,7 @@ try:
         print(f"  Topic: {message.topic}, Partition: {message.partition}, Offset: {message.offset}")
 
         try:
-            insert_message(conn, message.value)
+            insert_review(conn, message.value)
             print("  -> Saved to PostgreSQL")
         except Exception as db_error:
             print(f"  -> DB Error: {db_error}")

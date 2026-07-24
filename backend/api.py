@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from kafka import KafkaProducer
 from typing import List, Optional
 import json
@@ -12,12 +12,14 @@ from dashboard_utils import (
     get_latest_orders,
     get_sales_by_branch,
     get_branch_performance,
-    get_sales_by_payment
+    get_sales_by_payment,
+    fetch_product_reviews,
+    get_product_reviews_summary
 )
 
 app = FastAPI(
-    title="Kafka Producer API",
-    description="Receive customer orders and send them to Kafka"
+    title="Event Intelligence API",
+    description="Receives customer orders for Kafka and serves dashboard analytics"
 )
 
 app.add_middleware(
@@ -29,6 +31,7 @@ app.add_middleware(
 )
 
 TOPIC_NAME = "test-topic"
+REVIEW_TOPIC_NAME = "customer-review"
 KAFKA_BROKER = "kafka:29092"
 
 producer = None
@@ -47,6 +50,14 @@ class OrderRequest(BaseModel):
     payment_method: str
     notes: Optional[str] = ""
     items: List[OrderItem]
+
+
+class ReviewRequest(BaseModel):
+    product_id: str
+    product_name: str
+    customer_name: Optional[str] = ""
+    rating: int = Field(ge=1, le=5)
+    review_text: Optional[str] = ""
 
 
 def get_producer():
@@ -103,18 +114,36 @@ def create_order(order: OrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/review")
+def create_review(review: ReviewRequest):
+    try:
+        message = {
+            "product_id": review.product_id,
+            "product_name": review.product_name,
+            "customer_name": review.customer_name.strip() if review.customer_name else "Anonymous",
+            "rating": review.rating,
+            "review_text": review.review_text.strip() if review.review_text else ""
+        }
+
+        kafka_producer = get_producer()
+        future = kafka_producer.send(REVIEW_TOPIC_NAME, value=message)
+        result = future.get(timeout=10)
+
+        return {
+            "status": "success",
+            "message": "Review sent to Kafka",
+            "topic": REVIEW_TOPIC_NAME,
+            "partition": result.partition,
+            "offset": result.offset
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 def health():
     return {"status": "healthy"}
-
-
-from dashboard_utils import (
-    fetch_dashboard_data,
-    calculate_metrics,
-    get_latest_orders,
-    get_sales_by_branch,
-    get_branch_performance,
-)
 
 
 @app.get("/get_metrics")
@@ -159,6 +188,16 @@ def sales_by_payment():
     try:
          orders = fetch_dashboard_data()
          return get_sales_by_payment(orders)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/product_reviews_summary")
+def product_reviews_summary():
+    try:
+        reviews = fetch_product_reviews()
+        return get_product_reviews_summary(reviews)
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

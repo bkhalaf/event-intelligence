@@ -3,7 +3,7 @@ active_provider: "gemini"
 providers:
   gemini:
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
-    api_key: "PUT_YOUR_GEMINI_API_KEY"
+    api_key: "PUT_YOUR_gemini_API_KEY_HERE"
     model: "gemini-flash-lite-latest"
 
   groq:
@@ -24,10 +24,3 @@ kafka:
   topic: "output-topic"
   bootstrap_servers: "kafka:29092"
   group_id: "agent-consumer"
-
-database:
-  host: "postgres"
-  port: 5432
-  name: "kafka_events"
-  user: "admin"
-  password: "admin123"
