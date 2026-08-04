@@ -15,8 +15,10 @@ with open(config_path, 'r') as f:
 
 TOPIC_NAME = config['kafka']['topic']
 
-ACTIVE_PROVIDER = config['active_provider']
-PROVIDER_CONFIG = config['providers'][ACTIVE_PROVIDER]
+PROVIDERS = config['providers']
+PROVIDER_ROUTING_ORDER = config['provider_routing_order']
+REQUEST_TIMEOUT = config['request_timeout_seconds']
+MAX_RETRIES_PER_PROVIDER = config['max_retries_per_provider']
 
 db_config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
 with open(db_config_path, 'r') as f:
@@ -37,110 +39,184 @@ Order: {message}
 Provide a short analysis of this order in 2-3 sentences.
 """
 
-def analyze_with_gemini(message):
-    headers = {
-        'x-goog-api-key': PROVIDER_CONFIG['api_key'],
-        'Content-Type': 'application/json'
-    }
-    body = {
-        'contents': [
-            {'parts': [{'text': build_prompt(message)}]}
-        ]
-    }
-    response = requests.post(PROVIDER_CONFIG['url'], headers=headers, json=body)
-    result = response.json()
+def analyze_with_provider(message, provider_name):
+    provider_config = PROVIDERS[provider_name]
 
-    if 'candidates' not in result:
-        
-        print(f"Gemini raw response (status {response.status_code}): {result}")
-        raise RuntimeError(f"Gemini API did not return candidates: {result}")
+    url = provider_config['url']
+    model = provider_config.get('model')
+    api_key = provider_config.get('api_key')
 
-    return result['candidates'][0]['content']['parts'][0]['text']
+    prompt = build_prompt(message)
+
+    # Gemini
+    if provider_name == 'gemini':
+        headers = {
+            'x-goog-api-key': api_key,
+            'Content-Type': 'application/json'
+        }
+
+        body = {
+            'contents': [
+                {
+                    'parts': [
+                        {'text': prompt}
+                    ]
+                }
+            ]
+        }
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=body,
+            timeout=REQUEST_TIMEOUT
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        return result['candidates'][0]['content']['parts'][0]['text']
+
+    # OpenAI and Groq
+    elif provider_name in ['openai', 'groq']:
+        headers = {
+            'Authorization': f"Bearer {api_key}",
+            'Content-Type': 'application/json'
+        }
+
+        body = {
+            'model': model,
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': prompt
+                }
+            ]
+        }
+
+        response = requests.post(
+            url,
+            headers=headers,
+            json=body,
+            timeout=REQUEST_TIMEOUT
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        return result['choices'][0]['message']['content']
+
+    # Ollama
+    elif provider_name == 'ollama':
+        body = {
+            'model': model,
+            'prompt': prompt,
+            'stream': False
+        }
+
+        response = requests.post(
+            url,
+            json=body,
+            timeout=REQUEST_TIMEOUT
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        return result.get(
+            'response',
+            'No analysis available'
+        )
+
+    else:
+        raise ValueError(
+            f"Unsupported provider: {provider_name}"
+        )
 
 
-def analyze_with_ollama(message):
-    response = requests.post(PROVIDER_CONFIG['url'], json={
-        'model': PROVIDER_CONFIG['model'],
-        'prompt': build_prompt(message),
-        'stream': False
-    })
-    result = response.json()
-    return result.get('response', 'No analysis available')
-
-
-def analyze_with_groq(message):
-    headers = {
-        'Authorization': f"Bearer {PROVIDER_CONFIG['api_key']}",
-        'Content-Type': 'application/json'
-    }
-    body = {
-        'model': PROVIDER_CONFIG['model'],
-        'messages': [
-            {'role': 'user', 'content': build_prompt(message)}
-        ]
-    }
-    response = requests.post(PROVIDER_CONFIG['url'], headers=headers, json=body)
-    result = response.json()
-    return result['choices'][0]['message']['content']
-
-
-def analyze_with_openai(message):
-    headers = {
-        'Authorization': f"Bearer {PROVIDER_CONFIG['api_key']}",
-        'Content-Type': 'application/json'
-    }
-    body = {
-        'model': PROVIDER_CONFIG['model'],
-        'messages': [
-            {'role': 'user', 'content': build_prompt(message)}
-        ]
-    }
-    response = requests.post(PROVIDER_CONFIG['url'], headers=headers, json=body)
-    result = response.json()
-    return result['choices'][0]['message']['content']
-
-
-PROVIDER_HANDLERS = {
-    'gemini': analyze_with_gemini,
-    'ollama': analyze_with_ollama,
-    'groq': analyze_with_groq,
-    'openai': analyze_with_openai,
-}
-
-
-def analyze_with_model(message, max_retries=3):
-    handler = PROVIDER_HANDLERS.get(ACTIVE_PROVIDER)
-    if handler is None:
-        raise ValueError(f"Unknown provider: {ACTIVE_PROVIDER}")
-
+def analyze_with_model(message):
     last_error = None
-    for attempt in range(1, max_retries + 1):
-        try:
-            return handler(message)
-        except Exception as e:
-            last_error = e
-            wait_seconds = 2 ** attempt  # 2s, 4s, 8s
-            print(f"Attempt {attempt}/{max_retries} failed: {e}")
-            if attempt < max_retries:
-                print(f"Retrying in {wait_seconds}s...")
-                time.sleep(wait_seconds)
 
-    raise last_error
+    for provider_name in PROVIDER_ROUTING_ORDER:
+        print(f"\nTrying provider: {provider_name}")
+
+        for attempt in range(1, MAX_RETRIES_PER_PROVIDER + 1):
+            try:
+                analysis = analyze_with_provider(
+                    message,
+                    provider_name
+                )
+
+                print(
+                    f"{provider_name} succeeded "
+                    f"on attempt {attempt}"
+                )
+
+                return analysis, provider_name
+
+            except Exception as e:
+                last_error = e
+
+                print(
+                    f"{provider_name} failed "
+                    f"on attempt "
+                    f"{attempt}/{MAX_RETRIES_PER_PROVIDER}: {e}"
+                )
+
+                if attempt < MAX_RETRIES_PER_PROVIDER:
+                    wait_seconds = 2 ** attempt
+
+                    print(
+                        f"Retrying {provider_name} "
+                        f"in {wait_seconds} seconds..."
+                    )
+
+                    time.sleep(wait_seconds)
+
+        print(
+            f"{provider_name} is unavailable. "
+            f"Moving to the next provider..."
+        )
+
+    raise RuntimeError(
+        "All providers failed. "
+        f"Last error: {last_error}"
+    )
 
 
-def save_result(conn, original_message, analysis, duration_seconds):
+def save_result(
+    conn,
+    original_message,
+    analysis,
+    duration_seconds,
+    used_provider
+):
     cursor = conn.cursor()
+
     cursor.execute(
         """
-        INSERT INTO agent_results (original_message, agent_analysis)
+        INSERT INTO agent_results (
+            original_message,
+            agent_analysis
+        )
         VALUES (%s, %s)
         """,
-        (original_message, analysis)
+        (
+            original_message,
+            analysis
+        )
     )
+
     conn.commit()
     cursor.close()
-    print(f"Analysis took {duration_seconds:.2f} seconds (provider: {ACTIVE_PROVIDER})")
 
+    print(
+        f"Analysis took {duration_seconds:.2f} seconds "
+        f"(provider used: {used_provider})"
+    )
 
 consumer = KafkaConsumer(
     TOPIC_NAME,
@@ -152,7 +228,10 @@ consumer = KafkaConsumer(
 )
 
 print(f"AI Agent started, listening to topic: {TOPIC_NAME}")
-print(f"Using provider: {ACTIVE_PROVIDER} | model: {PROVIDER_CONFIG.get('model')}")
+print(
+    "Provider routing order: "
+    + " -> ".join(PROVIDER_ROUTING_ORDER)
+)
 print("Waiting for messages...")
 
 try:
@@ -163,13 +242,14 @@ try:
         original = message.value.get('original_message', str(message.value))
 
         try:
-            print(f"Analyzing with {ACTIVE_PROVIDER}...")
+            print("Analyzing message using provider routing...")
             start_time = time.time()
-            analysis = analyze_with_model(original)
+            analysis, used_provider = analyze_with_model(original)
             duration = time.time() - start_time
 
             print(f"Analysis: {analysis}")
-            save_result(conn, original, analysis, duration)
+            print(f"Provider used: {used_provider}")
+            save_result(conn, original, analysis, duration, used_provider)
             print("Saved to PostgreSQL")
         except Exception as msg_error:
             print(f"Failed to process message after retries: {msg_error}")
