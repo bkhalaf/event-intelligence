@@ -236,6 +236,73 @@ body {
   color: #dc2626;
 }
 
+/* ===== AI Review Summary ===== */
+
+.ai-review-summary {
+  margin: 4px 0 2px;
+  padding: 12px;
+  border: 1px solid rgba(15, 118, 110, 0.25);
+  border-radius: 10px;
+  background: rgba(15, 118, 110, 0.06);
+}
+
+.ai-review-summary__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ai-review-summary__badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.ai-review-summary__title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ai-review-summary__text {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ai-review-summary__provider {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 992px) {
+  .products__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 30px;
+  }
+
+  .products__list {
+    grid-template-columns: 1fr;
+  }
+
+  .container {
+    margin-top: -20px;
+  }
+}
+
 @media (max-width: 992px) {
   .products__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));

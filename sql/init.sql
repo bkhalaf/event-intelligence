@@ -22,3 +22,12 @@ CREATE TABLE IF NOT EXISTS product_reviews (
     review_text TEXT,
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS product_review_summaries (
+    product_id TEXT PRIMARY KEY,
+    product_name TEXT NOT NULL,
+    ai_summary TEXT NOT NULL,
+    provider_used TEXT,
+    review_count INTEGER NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

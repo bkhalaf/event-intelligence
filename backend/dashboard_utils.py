@@ -222,7 +222,44 @@ def fetch_product_reviews():
         for product_id, product_name, customer_name, rating, review_text, submitted_at in rows
     ]
 
+def fetch_ai_review_summaries():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            product_id,
+            ai_summary,
+            provider_used,
+            review_count,
+            updated_at
+        FROM product_review_summaries
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return {
+        product_id: {
+            "ai_summary": ai_summary,
+            "summary_provider": provider_used,
+            "summary_review_count": review_count,
+            "summary_updated_at": updated_at,
+        }
+        for (
+            product_id,
+            ai_summary,
+            provider_used,
+            review_count,
+            updated_at
+        ) in rows
+    }
+
+
 def get_product_reviews_summary(reviews, recent_limit=3):
+    ai_summaries = fetch_ai_review_summaries()
     stats = {}
 
     for review in reviews:
@@ -250,12 +287,16 @@ def get_product_reviews_summary(reviews, recent_limit=3):
 
     summary = []
     for entry in stats.values():
+        ai_summary = ai_summaries.get(entry["product_id"], {})
         summary.append({
             "product_id": entry["product_id"],
             "product_name": entry["product_name"],
             "review_count": entry["review_count"],
             "avg_rating": round(entry["rating_total"] / entry["review_count"], 1),
             "recent_reviews": entry["recent_reviews"],
+            "ai_summary": ai_summary.get("ai_summary"),
+            "summary_provider": ai_summary.get("summary_provider"),
+            "summary_updated_at": ai_summary.get("summary_updated_at"),
         })
 
     return summary
