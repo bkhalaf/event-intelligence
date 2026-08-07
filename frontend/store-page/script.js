@@ -100,6 +100,33 @@ function renderRecentReviews(insights) {
   return `<div class="product-reviews">${items}</div>`;
 }
 
+function renderAiSummary(insights) {
+  if (!insights || !insights.ai_summary) {
+    return "";
+  }
+
+  return `
+    <div class="ai-review-summary">
+      <div class="ai-review-summary__header">
+        <span class="ai-review-summary__badge">AI Agent</span>
+        <span class="ai-review-summary__title">🤖 AI Review Summary</span>
+      </div>
+
+      <div class="ai-review-summary__text">
+        ${insights.ai_summary}
+      </div>
+
+      ${
+        insights.summary_provider
+          ? `<div class="ai-review-summary__provider">
+               Powered by ${insights.summary_provider}
+             </div>`
+          : ""
+      }
+    </div>
+  `;
+}
+
 function renderReviewForm(product) {
   return `
     <form class="review-form" data-product-id="${product.product_id}" data-rating="0">
@@ -140,15 +167,22 @@ function renderProducts() {
             alt="${product.product_name}"
             class="product-image"
           />
+
           <h4>${product.product_name}</h4>
+
           <div class="product-meta">
             Product ID: ${product.product_id}<br />
             Unit Price: ${product.unit_price.toFixed(2)} ILS
           </div>
+
           <div class="product-rating">
             ${renderRatingSummary(insights)}
           </div>
+
           ${renderRecentReviews(insights)}
+
+          ${renderAiSummary(insights)}
+
           ${renderReviewForm(product)}
         </div>
       `;
@@ -222,6 +256,7 @@ productsList.addEventListener("submit", async (event) => {
       btn.textContent = "☆";
       btn.classList.remove("is-active");
     });
+    await loadReviewsSummary();
   } catch (error) {
     statusBox.className = "review-form__status error";
     statusBox.textContent = error.message;
