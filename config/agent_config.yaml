@@ -1,14 +1,21 @@
-active_provider: "gemini"
+provider_routing_order:
+  - gemini
+  - groq
+  - ollama
+  - openai
+
+request_timeout_seconds: 3
+max_retries_per_provider: 2
 
 providers:
   gemini:
     url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
-    api_key: "PUT_YOUR_gemini_API_KEY_HERE"
+    api_key: "PUT_YOUR_GEMINI_API_KEY_HERE"
     model: "gemini-flash-lite-latest"
 
   groq:
     url: "https://api.groq.com/openai/v1/chat/completions"
-    api_key: "PUT_YOUR_GROQ_API_KEY_HERE"
+    api_key: "PUT_YOUR_GEMINI_API_KEY_HERE"
     model: "llama-3.1-8b-instant"
 
   ollama:
