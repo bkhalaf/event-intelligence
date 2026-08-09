@@ -345,19 +345,109 @@ def process_review_message(conn, review_message):
 
     start_time = time.time()
 
-    summary, used_provider = analyze_with_model(prompt)
+    try:
+        summary, used_provider = analyze_with_model(prompt)
+    except Exception:
+        print(
+            "AI review summary skipped - "
+            "no available AI provider."
+        )
+        return
 
     duration = time.time() - start_time
 
     print(f"Summary generated using: {used_provider}")
     print(f"Generation took {duration:.2f} seconds")
 
-    save_review_summary(conn, product_id,
-    product_name, summary,
-    used_provider, len(reviews))
+    save_review_summary(
+        conn,
+        product_id,
+        product_name,
+        summary,
+        used_provider,
+        len(reviews)
+    )
 
     print("AI review summary saved to PostgreSQL")
-       
+
+
+def generate_initial_review_summaries(conn):
+    products = []
+
+    for attempt in range(5):
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT DISTINCT product_id, product_name
+            FROM product_reviews
+            ORDER BY product_id
+            """
+        )
+
+        products = cursor.fetchall()
+        cursor.close()
+
+        if products:
+            break
+
+        print(
+            f"No product reviews found yet. "
+            f"Waiting for seed... ({attempt + 1}/5)"
+        )
+        time.sleep(3)
+
+    if not products:
+        print(
+            "No existing product reviews found. "
+            "Skipping initial AI summaries."
+        )
+        return
+
+    print(
+        f"Found {len(products)} products "
+        "with existing reviews."
+    )
+
+    for product_id, product_name in products:
+        reviews = get_product_reviews(conn, product_id)
+
+        if not reviews:
+            continue
+
+        print(
+            f"Generating initial review summary for: "
+            f"{product_name} ({len(reviews)} reviews)"
+        )
+
+        prompt = build_review_summary_prompt(
+            product_name,
+            reviews
+        )
+
+        try:
+            summary, used_provider = analyze_with_model(prompt)
+        except Exception:
+            print(
+                "Initial AI summaries stopped - "
+                "no AI provider is currently available."
+            )
+            break
+
+        save_review_summary(
+            conn,
+            product_id,
+            product_name,
+            summary,
+            used_provider,
+            len(reviews)
+        )
+
+        print(
+            f"Initial AI summary saved for "
+            f"{product_name} using {used_provider}"
+        )
+
 consumer = KafkaConsumer(
     *TOPIC_NAMES,
     bootstrap_servers=[config['kafka']['bootstrap_servers']],
@@ -380,6 +470,13 @@ print("Waiting for messages...")
 try:
     conn = get_db_connection()
     print("Connected to PostgreSQL")
+
+    print("Checking for existing product reviews...")
+    generate_initial_review_summaries(conn)
+
+    print("Initial review summary check completed.")
+    print("Waiting for new Kafka messages...")
+
     for message in consumer:
         print(f"Received message: {message.value}")
         topic_name = message.topic

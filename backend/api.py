@@ -14,7 +14,8 @@ from dashboard_utils import (
     get_branch_performance,
     get_sales_by_payment,
     fetch_product_reviews,
-    get_product_reviews_summary
+    get_product_reviews_summary,
+    fetch_agent_results
 )
 
 app = FastAPI(
@@ -198,6 +199,15 @@ def product_reviews_summary():
     try:
         reviews = fetch_product_reviews()
         return get_product_reviews_summary(reviews)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agent_results")
+def agent_results():
+    try:
+        return fetch_agent_results()
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

@@ -308,12 +308,51 @@ async function loadLatestOrders() {
     }
 }
 
+async function loadAgentResults() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/agent_results`);
+        const data = await response.json();
+
+        const container = document.getElementById("agent-results");
+        container.innerHTML = "";
+
+        if (!data.length) {
+            container.innerHTML = "No AI agent insights yet.";
+            return;
+        }
+
+        data.slice(0, 5).forEach(result => {
+            container.innerHTML += `
+                <div class="agent-analysis-card">
+                    <div class="agent-analysis-card__order">
+                        ${result.original_message}
+                    </div>
+
+                    <div class="agent-analysis-card__analysis">
+                        <strong>AI Analysis:</strong><br>
+                        ${result.agent_analysis}
+                    </div>
+
+                    <div class="agent-analysis-card__time">
+                        Analyzed at:
+                        ${new Date(result.analyzed_at).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        });
+
+    } catch (error) {
+        console.error("Error loading agent results:", error);
+    }
+}
+
 function refreshAll() {
     loadMetrics();
     loadSalesChart();
     loadPaymentChart();
     loadLatestOrders();
     loadBranchPerformance();
+    loadAgentResults();
 }
 
 refreshAll();
