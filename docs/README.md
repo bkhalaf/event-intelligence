@@ -94,7 +94,8 @@ flowchart TD
 5. **Review** -- The store page lets customers submit a star rating and text review via `POST /review`, which publishes directly (no Flink transform) to the `customer-review` topic. A dedicated `review-consumer` persists each review to PostgreSQL's `product_reviews` table.
 6. **Summarize** -- The AI Agent also consumes messages from `customer-review`, aggregates all reviews for the same product, generates an AI-powered review summary using the configured provider, and stores the result in PostgreSQL's `product_review_summaries` table.
 7. **Serve** -- The analytics dashboard (`frontend/dashboard-page/`) reads aggregated metrics from the backend and displays them in real time. The order page (`frontend/order-page/`) lets users submit new orders, and the store page (`frontend/store-page/`) lets users submit and browse product reviews.
-8. **Seed** -- A startup seed script inserts initial demo records into PostgreSQL (only if the table is empty) so the dashboard has data on first run.
+8. **Seed** -- A startup seed script inserts initial demo order records and five diverse product reviews per product (only when the corresponding table is empty), providing ready-to-use demo data for both the Dashboard and Store page on first run.
+9. **Initial Review Summaries** -- On startup, the AI Agent checks the seeded product reviews and generates initial AI review summaries when an AI provider is available. If no provider is available, the Agent skips initial summary generation gracefully and continues running normally.
 
 ### Services
 
@@ -291,6 +292,10 @@ Returns per-branch statistics: order count, revenue, products sold, and average 
 
 Returns total sales aggregated by payment method.
 
+### `GET /agent_results`
+
+Returns the most recent AI-generated analyses for real customer orders processed by the AI Agent. Results are retrieved from the `agent_results` table and displayed in the analytics dashboard.
+
 ### `POST /review`
 
 Submits a product review from the Store page to the `customer-review` Kafka topic for asynchronous processing.
@@ -380,6 +385,10 @@ For every incoming review, the agent:
 
 The Store page retrieves this summary through the backend API and displays it alongside the average rating and recent customer reviews.
 
+On startup, the Agent also checks for existing product reviews and generates initial summaries so seeded reviews can have AI analysis before a customer submits a new review. If no AI provider is currently available, initial summary generation is stopped gracefully while the Agent continues running and remains available to process future Kafka messages.
+
+When a customer later submits a new review, the Agent reprocesses the product's reviews and updates the stored summary with the latest review data.
+
 ### Provider routing and failover
 
 Instead of relying on a single active provider, the AI Agent follows the configured `provider_routing_order`. If the current provider fails after the configured retry attempts, the request is automatically forwarded to the next available provider until a response is generated or all providers fail.
@@ -413,11 +422,12 @@ The project includes three independent static front-end interfaces, all built wi
 
 ### `frontend/dashboard-page/` -- Analytics Dashboard
 
-A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales_branch`, `/latest_orders`, and `/branch_performance`, and renders:
+A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales_branch`, `/latest_orders`, `/branch_performance`, and `/agent_results`, and renders:
 - Summary cards (total orders, revenue, products, branches)
 - A pie chart of sales by branch (Chart.js)
 - A live feed of the most recent orders
 - A branch-performance comparison table
+- Live AI Agent Insights showing AI-generated analyses for real customer orders processed by the Agent
 
 ### `frontend/order-page/` -- Order Submission Page
 

@@ -300,3 +300,32 @@ def get_product_reviews_summary(reviews, recent_limit=3):
         })
 
     return summary
+
+def fetch_agent_results(limit=10):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id, original_message, agent_analysis, analyzed_at
+        FROM agent_results
+        ORDER BY analyzed_at DESC
+        LIMIT %s
+        """,
+        (limit,)
+    )
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "original_message": row[1],
+            "agent_analysis": row[2],
+            "analyzed_at": row[3],
+        }
+        for row in rows
+    ]

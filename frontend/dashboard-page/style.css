@@ -246,7 +246,7 @@ body {
 
 .section-title {
   margin: 44px 0 20px;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.3px;
@@ -344,6 +344,59 @@ body {
 .order-notes {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* AI Agent Insights */
+.ai-analysis-section {
+  padding: 22px;
+}
+
+#agent-results {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agent-analysis-card {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  border-left: 4px solid var(--primary);
+  transition: 0.2s ease;
+}
+
+.agent-analysis-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.agent-analysis-card__order {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.agent-analysis-card__analysis {
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  color: #134e4a;
+  font-size: 14px;
+  line-height: 1.8;
+  margin-bottom: 10px;
+}
+
+.agent-analysis-card__analysis strong {
+  color: var(--primary-dark, #115e59);
+}
+
+.agent-analysis-card__time {
+  color: var(--muted);
+  font-size: 13.5px;
 }
 
 /* Branch performance table */
