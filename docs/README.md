@@ -94,7 +94,7 @@ flowchart TD
 5. **Review** -- The store page lets customers submit a star rating and text review via `POST /review`, which publishes directly (no Flink transform) to the `customer-review` topic. A dedicated `review-consumer` persists each review to PostgreSQL's `product_reviews` table.
 6. **Summarize** -- The AI Agent also consumes messages from `customer-review`, aggregates all reviews for the same product, generates an AI-powered review summary using the configured provider, and stores the result in PostgreSQL's `product_review_summaries` table.
 7. **Serve** -- The analytics dashboard (`frontend/dashboard-page/`) reads aggregated metrics from the backend and displays them in real time. The order page (`frontend/order-page/`) lets users submit new orders, and the store page (`frontend/store-page/`) lets users submit and browse product reviews.
-8. **Seed** -- A startup seed script inserts initial demo order records and five diverse product reviews per product (only when the corresponding table is empty), providing ready-to-use demo data for both the Dashboard and Store page on first run.
+8. **Seed** -- A startup seed script inserts initial demo order records and ensures that all predefined product review seed records exist. Missing review seed records are added automatically without duplicating existing reviews.
 9. **Initial Review Summaries** -- On startup, the AI Agent checks the seeded product reviews and generates initial AI review summaries when an AI provider is available. If no provider is available, the Agent skips initial summary generation gracefully and continues running normally.
 
 ### Services

@@ -300,19 +300,37 @@ def seed_data(conn):
 
     conn.commit()
 
-def reviews_table_has_data(conn):
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT COUNT(*) FROM product_reviews;")
-        count = cursor.fetchone()[0]
-        return count > 0
-
 
 def seed_reviews(conn):
     now = datetime.now()
+    inserted_count = 0
 
     with conn.cursor() as cursor:
         for i, review in enumerate(REVIEW_SEED_DATA):
-            submitted_at = now - timedelta(minutes=(len(REVIEW_SEED_DATA) - i) * 2)
+            cursor.execute(
+                """
+                SELECT 1
+                FROM product_reviews
+                WHERE product_id = %s
+                  AND customer_name = %s
+                  AND rating = %s
+                  AND review_text = %s
+                LIMIT 1
+                """,
+                (
+                    review["product_id"],
+                    review["customer_name"],
+                    review["rating"],
+                    review["review_text"]
+                )
+            )
+
+            if cursor.fetchone():
+                continue
+
+            submitted_at = now - timedelta(
+                minutes=(len(REVIEW_SEED_DATA) - i) * 2
+            )
 
             cursor.execute(
                 """
@@ -336,7 +354,10 @@ def seed_reviews(conn):
                 )
             )
 
+            inserted_count += 1
+
     conn.commit()
+    return inserted_count
 
     
 def main():
@@ -364,11 +385,14 @@ def main():
             print("Fake order seed data inserted successfully.")
 
         # Seed demo product reviews
-        if reviews_table_has_data(conn):
-            print("product_reviews already contains data. Skipping review seed.")
+        inserted_reviews = seed_reviews(conn)
+
+        if inserted_reviews > 0:
+            print(
+                f"Inserted {inserted_reviews} missing product review seed records."
+            )
         else:
-            seed_reviews(conn)
-            print("Fake product review seed data inserted successfully.")
+            print("All product review seed records already exist.")
 
     except Exception as e:
         print(f"Seed error: {e}")
