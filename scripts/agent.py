@@ -7,6 +7,8 @@ import requests
 import yaml
 import os
 import time
+import re
+from concurrent.futures import ThreadPoolExecutor
 
 # Load config
 config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'agent_config.yaml')
@@ -18,8 +20,12 @@ TOPIC_NAME = config['kafka']['topic']
 ACTIVE_PROVIDER = config['active_provider']
 PROVIDER_CONFIG = config['providers'][ACTIVE_PROVIDER]
 
-db_config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
-with open(db_config_path, 'r') as f:
+# Number of messages processed concurrently. Kept as a simple constant for now;
+# could be moved into agent_config.yaml later if it needs to be tuned per environment.
+MAX_WORKERS = 5
+
+DB_CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
+with open(DB_CONFIG_PATH, 'r') as f:
     DB_CONFIG = yaml.safe_load(f)
 
 
@@ -51,7 +57,6 @@ def analyze_with_gemini(message):
     result = response.json()
 
     if 'candidates' not in result:
-        
         print(f"Gemini raw response (status {response.status_code}): {result}")
         raise RuntimeError(f"Gemini API did not return candidates: {result}")
 
@@ -119,7 +124,10 @@ def analyze_with_model(message, max_retries=3):
             return handler(message)
         except Exception as e:
             last_error = e
-            wait_seconds = 2 ** attempt  # 2s, 4s, 8s
+            # If the provider's error response includes its own recommended
+            # retry delay (as Gemini does), honor that instead of guessing.
+            match = re.search(r"'retryDelay': '(\d+)s'", str(e))
+            wait_seconds = int(match.group(1)) + 1 if match else 2 ** attempt
             print(f"Attempt {attempt}/{max_retries} failed: {e}")
             if attempt < max_retries:
                 print(f"Retrying in {wait_seconds}s...")
@@ -128,18 +136,39 @@ def analyze_with_model(message, max_retries=3):
     raise last_error
 
 
-def save_result(conn, original_message, analysis, duration_seconds):
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO agent_results (original_message, agent_analysis)
-        VALUES (%s, %s)
-        """,
-        (original_message, analysis)
-    )
-    conn.commit()
-    cursor.close()
-    print(f"Analysis took {duration_seconds:.2f} seconds (provider: {ACTIVE_PROVIDER})")
+def save_result(original_message, analysis, duration_seconds):
+    # Each worker thread opens and closes its own connection: psycopg2
+    # connections are not safe to share across concurrently executing threads.
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO agent_results (original_message, agent_analysis)
+            VALUES (%s, %s)
+            """,
+            (original_message, analysis)
+        )
+        conn.commit()
+        cursor.close()
+        print(f"Analysis took {duration_seconds:.2f} seconds (provider: {ACTIVE_PROVIDER})")
+    finally:
+        conn.close()
+
+
+def process_message(message_value):
+    original = message_value.get('original_message', str(message_value))
+    print(f"Analyzing with {ACTIVE_PROVIDER}...")
+    start_time = time.monotonic()
+    try:
+        analysis = analyze_with_model(original)
+        duration = time.monotonic() - start_time
+        print(f"Analysis: {analysis}")
+        save_result(original, analysis, duration)
+        print("Saved to PostgreSQL")
+    except Exception as msg_error:
+        print(f"Failed to process message after retries: {msg_error}")
+    print("-" * 50)
 
 
 consumer = KafkaConsumer(
@@ -153,33 +182,22 @@ consumer = KafkaConsumer(
 
 print(f"AI Agent started, listening to topic: {TOPIC_NAME}")
 print(f"Using provider: {ACTIVE_PROVIDER} | model: {PROVIDER_CONFIG.get('model')}")
+print(f"Concurrency: {MAX_WORKERS} worker threads")
 print("Waiting for messages...")
 
+executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+
 try:
-    conn = get_db_connection()
-    print("Connected to PostgreSQL")
     for message in consumer:
         print(f"Received message: {message.value}")
-        original = message.value.get('original_message', str(message.value))
-
-        try:
-            print(f"Analyzing with {ACTIVE_PROVIDER}...")
-            start_time = time.time()
-            analysis = analyze_with_model(original)
-            duration = time.time() - start_time
-
-            print(f"Analysis: {analysis}")
-            save_result(conn, original, analysis, duration)
-            print("Saved to PostgreSQL")
-        except Exception as msg_error:
-            print(f"Failed to process message after retries: {msg_error}")
-
-        print("-" * 50)
+        # Hand off to a worker thread immediately and go back to reading
+        # the next message right away, instead of blocking here.
+        executor.submit(process_message, message.value)
 except KeyboardInterrupt:
     print("\nAgent stopped")
 except Exception as e:
     print(f"Error: {e}")
 finally:
+    print("Waiting for in-flight analyses to finish...")
+    executor.shutdown(wait=True)
     consumer.close()
-    if 'conn' in locals():
-        conn.close()
