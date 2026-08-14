@@ -70,12 +70,30 @@
       <section class="charts">
         <div class="card chart-card">
           <h2 class="card__title">Sales by Branch</h2>
-          <canvas id="salesChart"></canvas>
+          <div class="chart-container">
+            <canvas id="salesChart"></canvas>
+          </div>
         </div>
+        <div class="card chart-card">
+          <h2 class="card__title">Sales by Payment</h2>
+          <div class="chart-container">
+            <canvas id="paymentChart"></canvas>
+          </div>
+        </div>
+      </section>
 
+      <h2 class="section-title">Latest Orders</h2>
+      <section class="latest-orders-section">
         <div class="card latest-orders-card">
-          <h2 class="card__title">Latest Orders</h2>
           <div id="latest-orders">No orders yet</div>
+        </div>
+      </section>
+
+      <h2 class="section-title">AI Agent Insights</h2>
+
+      <section class="card ai-analysis-section">
+        <div id="agent-results">
+          No AI agent insights yet.
         </div>
       </section>
 

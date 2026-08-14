@@ -54,7 +54,10 @@ async function loadSalesChart() {
             },
             options: {
                 responsive: true,
-                cutout: "62%",
+                cutout: "60%",
+                animation: {
+                    duration: 0
+                },
                 plugins: {
                     legend: {
                         position: "bottom",
@@ -71,6 +74,157 @@ async function loadSalesChart() {
         console.error("Error loading sales chart:", error);
     }
 }
+let paymentChart = null;
+
+async function loadPaymentChart() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/sales_by_payment`);
+        const data = await response.json();
+
+        const labels = data.map(item => item.payment_method);
+        const values = data.map(item => item.sales);
+
+        const ctx = document.getElementById("paymentChart").getContext("2d");
+
+        if (paymentChart) {
+            paymentChart.destroy();
+        }
+
+        paymentChart = new Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: [
+                        "#36A2EB",
+                        "#4BC0C0",
+                        "#FF6384",
+                        "#FFCE56",
+                        "#9966FF",
+                        "#FF9F40"
+                    ],
+                    borderColor: "#ffffff",
+                    borderWidth: 2
+                }]
+            },
+             options: {
+                responsive: true,
+                cutout: "60%",
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0
+                },
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: {
+                            boxWidth: 40,
+                            padding: 15,
+                            font: {
+                                size: 13
+                            }
+                        }
+                    }
+                },
+                layout: {
+                    padding: 20
+                },
+                radius: "105%"
+            }
+        });
+
+    } catch (error) {
+        console.error("Error loading payment chart:", error);
+    }
+}
+async function loadBranchPerformance() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/branch_performance`);
+        const data = await response.json();
+
+        const table = document.getElementById("branch-table");
+        table.innerHTML = "";
+
+        data.forEach(branch => {
+            table.innerHTML += `
+                <tr>
+                    <td>
+                        <span class="branch-badge">
+                            ${branch.branch}
+                        </span>
+                     </td>
+                    <td>${branch.orders}</td>
+                    <td>
+                        <span class="revenue-badge">
+                            $${branch.revenue}
+                         </span>
+                    </td>
+                    <td>
+                        <span class="products-badge">
+                            ${branch.products}
+                        </span>
+                    </td>
+                    <td>$${branch.avg_order}</td>
+                 </tr>
+`;
+        });
+
+    } catch (error) {
+        console.error("Error loading branch performance:", error);
+    }
+}
+
+
+function loadAll() {
+    loadMetrics();
+    loadSalesChart();
+    loadLatestOrders();
+    loadBranchPerformance();
+    loadPaymentChart();
+}
+
+loadAll();                    // First time loading, the moment the page opens.
+setInterval(loadAll, 5000);  // Then repeat every 5 seconds 5000 milliseconds.
+
+
+async function loadBranchPerformance() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/branch_performance`);
+        const data = await response.json();
+
+        const table = document.getElementById("branch-table");
+        table.innerHTML = "";
+
+        data.forEach(branch => {
+            table.innerHTML += `
+                <tr>
+                    <td>
+                        <span class="branch-badge">
+                            ${branch.branch}
+                        </span>
+                     </td>
+                    <td>${branch.orders}</td>
+                    <td>
+                        <span class="revenue-badge">
+                            $${branch.revenue}
+                         </span>
+                    </td>
+                    <td>
+                        <span class="products-badge">
+                            ${branch.products}
+                        </span>
+                    </td>
+                    <td>$${branch.avg_order}</td>
+                 </tr>
+`;
+        });
+
+    } catch (error) {
+        console.error("Error loading branch performance:", error);
+    }
+}
+
 
 async function loadBranchPerformance() {
     try {
@@ -154,11 +308,51 @@ async function loadLatestOrders() {
     }
 }
 
+async function loadAgentResults() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/agent_results`);
+        const data = await response.json();
+
+        const container = document.getElementById("agent-results");
+        container.innerHTML = "";
+
+        if (!data.length) {
+            container.innerHTML = "No AI agent insights yet.";
+            return;
+        }
+
+        data.slice(0, 5).forEach(result => {
+            container.innerHTML += `
+                <div class="agent-analysis-card">
+                    <div class="agent-analysis-card__order">
+                        ${result.original_message}
+                    </div>
+
+                    <div class="agent-analysis-card__analysis">
+                        <strong>AI Analysis:</strong><br>
+                        ${result.agent_analysis}
+                    </div>
+
+                    <div class="agent-analysis-card__time">
+                        Analyzed at:
+                        ${new Date(result.analyzed_at).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        });
+
+    } catch (error) {
+        console.error("Error loading agent results:", error);
+    }
+}
+
 function refreshAll() {
     loadMetrics();
     loadSalesChart();
+    loadPaymentChart();
     loadLatestOrders();
     loadBranchPerformance();
+    loadAgentResults();
 }
 
 refreshAll();

@@ -246,7 +246,7 @@ body {
 
 .section-title {
   margin: 44px 0 20px;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.3px;
@@ -264,21 +264,38 @@ body {
 }
 
 /* Latest orders */
-#latest-orders {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-height: 420px;
-  overflow-y: auto;
+.latest-orders-section{
+    margin-top:32px;
 }
 
-.order-card {
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  border-left: 4px solid var(--accent);
-  transition: 0.2s ease;
+#latest-orders{
+    display:flex;
+    gap:18px;
+
+    overflow-x:auto;
+    overflow-y:hidden;
+
+    padding-bottom:8px;
+
+    scrollbar-width:thin;
+}
+
+.order-card{
+    min-width:280px;
+    flex-shrink:0;
+
+    background:white;
+    border-radius:18px;
+    padding:18px;
+
+    box-shadow:0 6px 18px rgba(0,0,0,.08);
+}
+.latest-orders-section{
+    margin-top: 32px;
+}
+
+.latest-orders-card{
+    padding: 24px;
 }
 
 .order-card:hover {
@@ -327,6 +344,59 @@ body {
 .order-notes {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* AI Agent Insights */
+.ai-analysis-section {
+  padding: 22px;
+}
+
+#agent-results {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.agent-analysis-card {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  border-left: 4px solid var(--primary);
+  transition: 0.2s ease;
+}
+
+.agent-analysis-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.agent-analysis-card__order {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.agent-analysis-card__analysis {
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  color: #134e4a;
+  font-size: 14px;
+  line-height: 1.8;
+  margin-bottom: 10px;
+}
+
+.agent-analysis-card__analysis strong {
+  color: var(--primary-dark, #115e59);
+}
+
+.agent-analysis-card__time {
+  color: var(--muted);
+  font-size: 13.5px;
 }
 
 /* Branch performance table */
@@ -424,3 +494,35 @@ tbody tr:last-child td {
     padding: 10px;
   }
 }
+
+
+
+.chart-card{
+    background:#fff;
+    border-radius:24px;
+    padding:24px;
+
+    display:flex;
+    flex-direction:column;
+    justify-content:flex-start;
+
+    height:520px;
+}
+
+.charts{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px;
+}
+
+.chart-container{
+    width:320px;
+    height:320px;
+    margin:auto;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+

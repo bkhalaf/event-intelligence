@@ -92,8 +92,10 @@ flowchart TD
 3. **Store** -- The Dockerized consumer reads from `output-topic` and persists the original and transformed messages to PostgreSQL.
 4. **Analyze** -- The AI Agent reads from `output-topic` in parallel with the consumer, analyzes each order using a configurable AI provider (Gemini, Groq, Ollama, or OpenAI -- selected via `config/agent_config.yaml`), with automatic retry and exponential backoff, and persists the analysis to PostgreSQL's `agent_results` table.
 5. **Review** -- The store page lets customers submit a star rating and text review via `POST /review`, which publishes directly (no Flink transform) to the `customer-review` topic. A dedicated `review-consumer` persists each review to PostgreSQL's `product_reviews` table.
-6. **Serve** -- The analytics dashboard (`frontend/dashboard-page/`) reads aggregated metrics from the backend and displays them in real time. The order page (`frontend/order-page/`) lets users submit new orders, and the store page (`frontend/store-page/`) lets users submit and browse product reviews.
-7. **Seed** -- A startup seed script inserts initial demo records into PostgreSQL (only if the table is empty) so the dashboard has data on first run.
+6. **Summarize** -- The AI Agent also consumes messages from `customer-review`, aggregates all reviews for the same product, generates an AI-powered review summary using the configured provider, and stores the result in PostgreSQL's `product_review_summaries` table.
+7. **Serve** -- The analytics dashboard (`frontend/dashboard-page/`) reads aggregated metrics from the backend and displays them in real time. The order page (`frontend/order-page/`) lets users submit new orders, and the store page (`frontend/store-page/`) lets users submit and browse product reviews.
+8. **Seed** -- A startup seed script inserts initial demo order records and ensures that all predefined product review seed records exist. Missing review seed records are added automatically without duplicating existing reviews.
+9. **Initial Review Summaries** -- On startup, the AI Agent checks the seeded product reviews and generates initial AI review summaries when an AI provider is available. If no provider is available, the Agent skips initial summary generation gracefully and continues running normally.
 
 ### Services
 
@@ -109,7 +111,7 @@ flowchart TD
 | Kafka UI | `provectuslabs/kafka-ui:latest` | 8080 | Kafka topic monitoring |
 | PostgreSQL | `postgres:16-alpine` | 5433 → 5432 | Persistent storage |
 | Consumer | Custom (`Dockerfile`) | -- | Reads `output-topic`, writes raw + transformed messages to PostgreSQL |
-| AI Agent | Custom (`Dockerfile`) | -- | Reads `output-topic`, analyzes orders via the configured AI provider, stores results in PostgreSQL |
+| AI Agent | Custom (`Dockerfile`) | -- | Reads output-topic and customer-review, analyzes customer orders, generates AI-powered product review summaries, and stores results in PostgreSQL. |
 | Review Consumer | Custom (`Dockerfile`) | -- | Reads `customer-review`, writes ratings + review text to PostgreSQL's `product_reviews` table |
 | DB Seed | Custom (`Dockerfile`) | -- | Inserts demo rows once at startup, only if the table is empty |
 
@@ -123,7 +125,7 @@ flowchart TD
 
 ### 1. Configure the AI Agent provider
 
-Open `config/agent_config.yaml` and set `active_provider` to one of `gemini`, `groq`, `ollama`, or `openai`, and fill in the matching `api_key` (for Gemini/Groq/OpenAI). See [AI Agent](#ai-agent) for full details.
+Open `config/agent_config.yaml`, configure the available providers, and set `provider_routing_order` to define the order in which the AI Agent should try them. Also configure `request_timeout_seconds` and `max_retries_per_provider` as needed. See [AI Agent](#ai-agent) for full details.
 
 > ⚠️ **Never commit a real API key.** The file is tracked with placeholder values (e.g. `PUT_YOUR_GEMINI_API_KEY`) -- fill in real keys locally only, and make sure they are removed again before pushing.
 
@@ -192,7 +194,7 @@ event-intelligence/
 │   ├── dashboard_utils.py    # Parsing/aggregation logic used by the dashboard endpoints
 │   └── api.py                # FastAPI app: order-creation (Kafka) + dashboard analytics endpoints
 ├── config/
-│   └── agent_config.yaml     # AI provider configuration (active provider + credentials)
+│   └── agent_config.yaml     # AI provider routing, retries, timeout, and provider configuration
 ├── frontend/
 │   ├── dashboard-page/         # Static real-time analytics dashboard
 │   │   ├── index.html
@@ -215,8 +217,9 @@ event-intelligence/
 │   ├── Dockerfile
 │   └── flink_job.py
 ├── scripts/
-│   ├── agent.py              # AI Agent: consumes output-topic, calls the active AI provider
+│   ├── agent.py              # AI Agent: consumes orders and reviews, supports provider routing, failover, and AI review summarization
 │   ├── consumer.py           # Kafka consumer, persists to PostgreSQL
+│   ├── review_consumer.py    # Consumes customer-review messages and stores product reviews
 │   └── seed.py                # Inserts demo records into PostgreSQL on first run
 ├── sql/
 │   └── init.sql              # PostgreSQL schema (kafka_messages, agent_results)
@@ -285,51 +288,123 @@ Returns total sales aggregated per branch.
 
 Returns per-branch statistics: order count, revenue, products sold, and average order value.
 
+### `GET /sales_by_payment`
+
+Returns total sales aggregated by payment method.
+
+### `GET /agent_results`
+
+Returns the most recent AI-generated analyses for real customer orders processed by the AI Agent. Results are retrieved from the `agent_results` table and displayed in the analytics dashboard.
+
+### `POST /review`
+
+Submits a product review from the Store page to the `customer-review` Kafka topic for asynchronous processing.
+
+**Request body:**
+
+```json
+{
+  "product_id": "E1002",
+  "product_name": "Anker Power Bank",
+  "customer_name": "Ahmad",
+  "rating": 4,
+  "review_text": "Good quality and fast charging."
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Review sent to Kafka",
+  "topic": "customer-review",
+  "partition": 0,
+  "offset": 1
+}
+```
+
+### `GET /product_reviews_summary`
+
+Returns product review statistics, including:
+
+- Average rating
+- Review count
+- Recent customer reviews
+- AI-generated review summary
+- AI provider used to generate the summary
+
 ## AI Agent
 
-The AI Agent (`scripts/agent.py`) is a Dockerized Python service that consumes processed orders from `output-topic` **in parallel with the Consumer**, sends each order to an AI provider for a short natural-language analysis, and stores the result in PostgreSQL's `agent_results` table.
+The AI Agent (`scripts/agent.py`) is a Dockerized Python service that consumes processed orders from `output-topic` and product reviews from `customer-review`. It performs AI-powered order analysis and product review summarization using a configurable multi-provider routing system, then stores the generated results in PostgreSQL.
 
 ### Provider-agnostic design
 
-Instead of being tied to a single AI provider, the agent is built to be **fully configurable** through `config/agent_config.yaml`. One field, `active_provider`, decides which provider is used at runtime, and the agent automatically routes each request to the matching handler function:
+Instead of being tied to a single AI provider, the agent is configured through `config/agent_config.yaml` and uses a provider routing order. All supported providers are handled through one general function, `analyze_with_provider(prompt, provider_name)`, so adding or selecting a provider does not require creating a separate analysis function for each model.
 
 ```yaml
-active_provider: "gemini"   # one of: gemini, groq, ollama, openai
+provider_routing_order:
+  - gemini
+  - groq
+  - ollama
+  - openai
+
+request_timeout_seconds: 3
+max_retries_per_provider: 2
 
 providers:
   gemini:
-    url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
-    api_key: "PUT_YOUR_GEMINI_API_KEY"
-    model: "gemini-flash-lite-latest"
+    api_key: "..."
+    model: "gemini-..."
 
   groq:
-    url: "https://api.groq.com/openai/v1/chat/completions"
-    api_key: "PUT_YOUR_GROQ_API_KEY_HERE"
-    model: "llama-3.1-8b-instant"
+    api_key: "..."
+    model: "llama-..."
 
   ollama:
     url: "http://<your-ollama-host>:11434/api/generate"
-    model: "llama3"
+    model: "llama3:latest"
 
   openai:
-    url: "https://api.openai.com/v1/chat/completions"
-    api_key: "PUT_YOUR_OPENAI_API_KEY_HERE"
+    api_key: "..."
     model: "gpt-4o-mini"
 ```
 
-Switching providers requires **no code changes** -- just edit `active_provider` (and make sure the matching `api_key` / `url` is filled in) and restart the `agent` container.
+Switching providers requires no code changes. Simply update the `provider_routing_order` or the provider configuration in `config/agent_config.yaml`, then restart the `agent` container.
 
-### Currently active provider
+### AI Review Summarization
 
-The pipeline currently runs with **`gemini`** as the active provider, using Google AI Studio's `gemini-flash-lite-latest` model. This model was chosen after testing showed `gemini-2.5-flash` returning 404 for new accounts and `gemini-flash-latest` repeatedly hitting capacity errors.
+Besides analyzing customer orders, the AI Agent also processes product reviews streamed through the `customer-review` Kafka topic.
 
-### Reliability: retries with exponential backoff
+For every incoming review, the agent:
 
-Every call to the active provider goes through a retry loop (`analyze_with_model`, up to 3 attempts) with exponential backoff (2s → 4s → 8s between attempts) and per-message exception handling. If a call still fails after all retries, the error is logged and that message is skipped -- it does not crash the agent or block the next message.
+1. Retrieves all existing reviews for the same product from PostgreSQL.
+2. Includes the newly submitted review.
+3. Generates a concise AI-powered summary using the selected provider.
+4. Stores the generated summary, provider name, review count, and update timestamp in the `product_review_summaries` table.
 
-### Known limitation
+The Store page retrieves this summary through the backend API and displays it alongside the average rating and recent customer reviews.
 
-The `ollama` provider entry currently requires a local network IP address to be filled in manually, which only works on the machine where that address is reachable and is not portable across environments/teammates. This is worth revisiting if `ollama` is ever set as the active provider outside a single developer's machine.
+On startup, the Agent also checks for existing product reviews and generates initial summaries so seeded reviews can have AI analysis before a customer submits a new review. If no AI provider is currently available, initial summary generation is stopped gracefully while the Agent continues running and remains available to process future Kafka messages.
+
+When a customer later submits a new review, the Agent reprocesses the product's reviews and updates the stored summary with the latest review data.
+
+### Provider routing and failover
+
+Instead of relying on a single active provider, the AI Agent follows the configured `provider_routing_order`. If the current provider fails after the configured retry attempts, the request is automatically forwarded to the next available provider until a response is generated or all providers fail.
+
+### Reliability
+
+Each provider request uses configurable timeout and retry settings (`request_timeout_seconds` and `max_retries_per_provider`). Failed requests are retried before the agent automatically switches to the next provider in the routing order.
+
+### Supported providers
+
+The current implementation supports:
+
+- Gemini
+- Groq
+- Ollama
+- OpenAI
 
 ### Security note
 
@@ -343,19 +418,30 @@ docker exec -it postgres psql -U admin -d kafka_events -c "SELECT * FROM agent_r
 
 ## Frontend Interfaces
 
-The project includes two independent static front-ends, both plain HTML/CSS/JS (no build step) and both calling the Producer API directly at `http://localhost:5000`.
+The project includes three independent static front-end interfaces, all built with plain HTML/CSS/JS (no build step) and connected to the Producer API at `http://localhost:5000`.
 
 ### `frontend/dashboard-page/` -- Analytics Dashboard
 
-A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales_branch`, `/latest_orders`, and `/branch_performance`, and renders:
+A read-only, real-time monitoring view. On load it calls `/get_metrics`, `/sales_branch`, `/latest_orders`, `/branch_performance`, and `/agent_results`, and renders:
 - Summary cards (total orders, revenue, products, branches)
 - A pie chart of sales by branch (Chart.js)
 - A live feed of the most recent orders
 - A branch-performance comparison table
+- Live AI Agent Insights showing AI-generated analyses for real customer orders processed by the Agent
 
 ### `frontend/order-page/` -- Order Submission Page
 
 A simple customer-facing form for placing new orders. It lets a user pick a branch, payment method, and product quantities, previews the JSON payload before sending, and submits it via `POST /order`.
+
+### `frontend/store-page/` -- Product Store
+
+A customer-facing product catalog that allows users to:
+
+- Browse available products.
+- Submit star ratings and text reviews.
+- View recent customer reviews.
+- View average product ratings.
+- View AI-generated review summaries produced by the AI Agent, including the provider used to generate each summary.
 
 ## Testing
 
