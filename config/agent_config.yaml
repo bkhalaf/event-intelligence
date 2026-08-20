@@ -1,0 +1,35 @@
+provider_routing_order:
+  - gemini
+  - groq
+  - ollama
+  - openai
+
+request_timeout_seconds: 3
+max_retries_per_provider: 2
+
+providers:
+  gemini:
+    url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
+    api_key: "PUT_YOUR_OPENAI_API_KEY_HERE"
+    model: "gemini-flash-lite-latest"
+
+  groq:
+    url: "https://api.groq.com/openai/v1/chat/completions"
+    api_key: "PUT_YOUR_OPENAI_API_KEY_HERE"
+    model: "llama-3.1-8b-instant"
+
+  ollama:
+    url: "http://host.docker.internal:11434/api/generate"
+    model: "llama3:latest"
+
+  openai:
+    url: "https://api.openai.com/v1/chat/completions"
+    api_key: "PUT_YOUR_OPENAI_API_KEY_HERE"
+    model: "gpt-4o-mini"
+
+kafka:
+  topics: 
+    - "output-topic"
+    - "customer-review"
+  bootstrap_servers: "kafka:29092"
+  group_id: "agent-consumer"

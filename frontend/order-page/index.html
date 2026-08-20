@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Order — Event Intelligence</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <nav class="topbar">
+      <a class="brand" href="index.html">
+        <span class="brand__dot"></span>
+        Event Intelligence
+      </a>
+      <div class="topbar__links">
+        <a class="topbar__link topbar__link--active" href="index.html">Order</a>
+        <a class="topbar__link" href="../dashboard-page/index.html">Dashboard</a>
+        <a class="topbar__link topbar__link--ghost" href="index.html">Classic view</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero__inner">
+        <p class="eyebrow">Event Intelligence Demo</p>
+        <h1>Place a new order</h1>
+        <p class="hero__text">
+          Build an order, watch the live payload preview, and send it straight into the Kafka pipeline
+          through the FastAPI producer.
+        </p>
+        <div class="hero__pills">
+          <span class="pill">6 products</span>
+          <span class="pill">4 branches</span>
+          <span class="pill">3 payment methods</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="col-main">
+        <form id="orderForm" class="card">
+          <h2 class="card__title">Order details</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="branch">Branch</label>
+              <select id="branch" name="branch" required>
+                <option value="">Select branch</option>
+                <option value="Gaza">Gaza</option>
+                <option value="Rafah">Rafah</option>
+                <option value="Khan Younis">Khan Younis</option>
+                <option value="Deir al-Balah">Deir al-Balah</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="customer_name">Customer name</label>
+              <input
+                type="text"
+                id="customer_name"
+                name="customer_name"
+                placeholder="Enter customer name"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label for="payment_method">Payment method</label>
+              <select id="payment_method" name="payment_method" required>
+                <option value="">Select payment method</option>
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+                <option value="Jawwal Pay">Jawwal Pay</option>
+              </select>
+            </div>
+
+            <div class="field field--full">
+              <label for="notes">Notes</label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows="3"
+                placeholder="Optional notes..."
+              ></textarea>
+            </div>
+          </div>
+        </form>
+
+        <div class="card">
+          <div class="products__header">
+            <h2 class="card__title">Select products</h2>
+            <p>Use the stepper to set a quantity for any item you'd like to include.</p>
+          </div>
+          <div id="productsList" class="products__list"></div>
+        </div>
+      </section>
+
+      <aside class="col-side">
+        <div class="cart card">
+          <h2 class="card__title">Order summary</h2>
+          <div id="cartItems" class="cart__items empty">
+            No items selected yet.
+          </div>
+          <div class="cart__total">
+            <span>Total</span>
+            <strong id="cartTotal">0.00 ILS</strong>
+          </div>
+
+          <div class="actions">
+            <button type="submit" form="orderForm" class="btn btn--primary">Send order</button>
+            <button type="button" id="resetBtn" class="btn btn--secondary">Reset</button>
+          </div>
+
+          <div id="resultBox" class="result-box empty">
+            No request sent yet.
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
