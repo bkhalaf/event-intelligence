@@ -1,4 +1,5 @@
 from datetime import datetime
+from unittest.mock import patch
 from backend.dashboard_utils import parse_items, parse_order, calculate_metrics, get_sales_by_branch, get_branch_performance, get_latest_orders, get_product_reviews_summary
 
 # ---------- test parse_items ----------
@@ -241,7 +242,8 @@ def make_review(product_id, product_name, rating, review_text="", customer_name=
 
 
 def test_get_product_reviews_summary_empty_returns_empty_list():
-    assert get_product_reviews_summary([]) == []
+    with patch("backend.dashboard_utils.fetch_ai_review_summaries", return_value={}):
+        assert get_product_reviews_summary([]) == []
 
 
 def test_get_product_reviews_summary_calculates_avg_rating_and_count():
@@ -249,7 +251,8 @@ def test_get_product_reviews_summary_calculates_avg_rating_and_count():
         make_review("E1001", "Lenovo IdeaPad Laptop", 5),
         make_review("E1001", "Lenovo IdeaPad Laptop", 3),
     ]
-    result = get_product_reviews_summary(reviews)
+    with patch("backend.dashboard_utils.fetch_ai_review_summaries", return_value={}):
+        result = get_product_reviews_summary(reviews)
 
     assert len(result) == 1
     assert result[0]["product_id"] == "E1001"
@@ -263,7 +266,8 @@ def test_get_product_reviews_summary_rounds_avg_rating_to_one_decimal():
         make_review("E1002", "Anker Power Bank", 4),
         make_review("E1002", "Anker Power Bank", 4),
     ]
-    result = get_product_reviews_summary(reviews)
+    with patch("backend.dashboard_utils.fetch_ai_review_summaries", return_value={}):
+        result = get_product_reviews_summary(reviews)
 
     assert result[0]["avg_rating"] == 4.3
 
@@ -273,7 +277,8 @@ def test_get_product_reviews_summary_separates_multiple_products():
         make_review("E1001", "Lenovo IdeaPad Laptop", 5),
         make_review("E1002", "Anker Power Bank", 3),
     ]
-    result = get_product_reviews_summary(reviews)
+    with patch("backend.dashboard_utils.fetch_ai_review_summaries", return_value={}):
+        result = get_product_reviews_summary(reviews)
 
     product_ids = {entry["product_id"] for entry in result}
     assert product_ids == {"E1001", "E1002"}
@@ -284,13 +289,15 @@ def test_get_product_reviews_summary_limits_recent_reviews():
         make_review("E1001", "Lenovo IdeaPad Laptop", 5, review_text=f"review {i}")
         for i in range(5)
     ]
-    result = get_product_reviews_summary(reviews, recent_limit=3)
+    with patch("backend.dashboard_utils.fetch_ai_review_summaries", return_value={}):
+        result = get_product_reviews_summary(reviews, recent_limit=3)
 
     assert len(result[0]["recent_reviews"]) == 3
 
 
 def test_get_product_reviews_summary_defaults_missing_customer_name_to_anonymous():
     reviews = [make_review("E1001", "Lenovo IdeaPad Laptop", 5, customer_name=None)]
-    result = get_product_reviews_summary(reviews)
+    with patch("backend.dashboard_utils.fetch_ai_review_summaries", return_value={}):
+        result = get_product_reviews_summary(reviews)
 
     assert result[0]["recent_reviews"][0]["customer_name"] == "Anonymous"

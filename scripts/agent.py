@@ -7,6 +7,8 @@ import requests
 import yaml
 import os
 import time
+import re
+from concurrent.futures import ThreadPoolExecutor
 
 # Load config
 config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'agent_config.yaml')
@@ -19,6 +21,14 @@ PROVIDERS = config['providers']
 PROVIDER_ROUTING_ORDER = config['provider_routing_order']
 REQUEST_TIMEOUT = config['request_timeout_seconds']
 MAX_RETRIES_PER_PROVIDER = config['max_retries_per_provider']
+
+# Number of order messages processed concurrently. Kept as a simple constant for
+# now; could be moved into agent_config.yaml later if it needs to be tuned per
+# environment. Only the order-processing path (output-topic) is parallelized;
+# review-summary processing stays sequential to avoid a race condition on the
+# product_review_summaries upsert when multiple reviews for the same product
+# arrive close together.
+MAX_WORKERS = 5
 
 db_config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'postgres_db_config.yaml')
 with open(db_config_path, 'r') as f:
@@ -58,6 +68,7 @@ Order: {message}
 Provide a short analysis of this order in 2-3 sentences.
 """
 
+
 def build_review_summary_prompt(product_name, reviews):
     review_lines = []
 
@@ -89,6 +100,7 @@ Write a concise summary in 2-3 sentences that:
 - does not invent any information.
 """
 
+
 def analyze_with_provider(prompt, provider_name):
     provider_config = PROVIDERS[provider_name]
 
@@ -96,35 +108,26 @@ def analyze_with_provider(prompt, provider_name):
     model = provider_config.get('model')
     api_key = provider_config.get('api_key')
 
-
     # Gemini
     if provider_name == 'gemini':
         headers = {
             'x-goog-api-key': api_key,
             'Content-Type': 'application/json'
         }
-
         body = {
             'contents': [
-                {
-                    'parts': [
-                        {'text': prompt}
-                    ]
-                }
+                {'parts': [{'text': prompt}]}
             ]
         }
+        response = requests.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=body,
-            timeout=REQUEST_TIMEOUT
-        )
-
-        response.raise_for_status()
+        # Raised manually (instead of response.raise_for_status()) so the full
+        # response body, including any provider-reported retry delay, is
+        # preserved in the exception message for analyze_with_model to parse.
+        if response.status_code != 200:
+            raise RuntimeError(f"gemini API error (status {response.status_code}): {response.text}")
 
         result = response.json()
-
         return result['candidates'][0]['content']['parts'][0]['text']
 
     # OpenAI and Groq
@@ -133,28 +136,18 @@ def analyze_with_provider(prompt, provider_name):
             'Authorization': f"Bearer {api_key}",
             'Content-Type': 'application/json'
         }
-
         body = {
             'model': model,
             'messages': [
-                {
-                    'role': 'user',
-                    'content': prompt
-                }
+                {'role': 'user', 'content': prompt}
             ]
         }
+        response = requests.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT)
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=body,
-            timeout=REQUEST_TIMEOUT
-        )
-
-        response.raise_for_status()
+        if response.status_code != 200:
+            raise RuntimeError(f"{provider_name} API error (status {response.status_code}): {response.text}")
 
         result = response.json()
-
         return result['choices'][0]['message']['content']
 
     # Ollama
@@ -164,29 +157,21 @@ def analyze_with_provider(prompt, provider_name):
             'prompt': prompt,
             'stream': False
         }
+        response = requests.post(url, json=body, timeout=REQUEST_TIMEOUT)
 
-        response = requests.post(
-            url,
-            json=body,
-            timeout=REQUEST_TIMEOUT
-        )
-
-        response.raise_for_status()
+        if response.status_code != 200:
+            raise RuntimeError(f"ollama API error (status {response.status_code}): {response.text}")
 
         result = response.json()
-
-        return result.get(
-            'response',
-            'No analysis available'
-        )
+        return result.get('response', 'No analysis available')
 
     else:
-        raise ValueError(
-            f"Unsupported provider: {provider_name}"
-        )
+        raise ValueError(f"Unsupported provider: {provider_name}")
 
 
 def analyze_with_model(prompt):
+    """Tries each provider in PROVIDER_ROUTING_ORDER in turn, retrying each one
+    up to MAX_RETRIES_PER_PROVIDER times before moving to the next provider."""
     last_error = None
 
     for provider_name in PROVIDER_ROUTING_ORDER:
@@ -194,97 +179,51 @@ def analyze_with_model(prompt):
 
         for attempt in range(1, MAX_RETRIES_PER_PROVIDER + 1):
             try:
-                analysis = analyze_with_provider(
-                    prompt,
-                    provider_name
-                )
-
-                print(
-                    f"{provider_name} succeeded "
-                    f"on attempt {attempt}"
-                )
-
+                analysis = analyze_with_provider(prompt, provider_name)
+                print(f"{provider_name} succeeded on attempt {attempt}")
                 return analysis, provider_name
 
             except Exception as e:
                 last_error = e
-
-                print(
-                    f"{provider_name} failed "
-                    f"on attempt "
-                    f"{attempt}/{MAX_RETRIES_PER_PROVIDER}: {e}"
-                )
+                print(f"{provider_name} failed on attempt {attempt}/{MAX_RETRIES_PER_PROVIDER}: {e}")
 
                 if attempt < MAX_RETRIES_PER_PROVIDER:
-                    wait_seconds = 2 ** attempt
-
-                    print(
-                        f"Retrying {provider_name} "
-                        f"in {wait_seconds} seconds..."
-                    )
-
+                    # If the provider's error response includes its own
+                    # recommended retry delay (as Gemini does), honor that
+                    # instead of guessing with a fixed exponential backoff.
+                    match = re.search(r"'retryDelay': '(\d+)s'", str(e))
+                    wait_seconds = int(match.group(1)) + 1 if match else 2 ** attempt
+                    print(f"Retrying {provider_name} in {wait_seconds} seconds...")
                     time.sleep(wait_seconds)
 
-        print(
-            f"{provider_name} is unavailable. "
-            f"Moving to the next provider..."
-        )
+        print(f"{provider_name} is unavailable. Moving to the next provider...")
 
-    raise RuntimeError(
-        "All providers failed. "
-        f"Last error: {last_error}"
-    )
+    raise RuntimeError(f"All providers failed. Last error: {last_error}")
 
 
-def save_result(
-    conn,
-    original_message,
-    analysis,
-    duration_seconds,
-    used_provider
-):
+def save_result(conn, original_message, analysis, duration_seconds, used_provider):
     cursor = conn.cursor()
-
     cursor.execute(
         """
-        INSERT INTO agent_results (
-            original_message,
-            agent_analysis
-        )
+        INSERT INTO agent_results (original_message, agent_analysis)
         VALUES (%s, %s)
         """,
-        (
-            original_message,
-            analysis
-        )
+        (original_message, analysis)
     )
-
     conn.commit()
     cursor.close()
 
-    print(
-        f"Analysis took {duration_seconds:.2f} seconds "
-        f"(provider used: {used_provider})"
-    )
+    # Kept as "(provider: X)", matching the original log format, so that
+    # scripts/parse_agent_timings.py continues to parse these lines correctly.
+    print(f"Analysis took {duration_seconds:.2f} seconds (provider: {used_provider})")
 
-def save_review_summary(
-    conn,
-    product_id,
-    product_name,
-    summary,
-    used_provider,
-    review_count
-):
+
+def save_review_summary(conn, product_id, product_name, summary, used_provider, review_count):
     cursor = conn.cursor()
-
     cursor.execute(
         """
         INSERT INTO product_review_summaries (
-            product_id,
-            product_name,
-            ai_summary,
-            provider_used,
-            review_count
+            product_id, product_name, ai_summary, provider_used, review_count
         )
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (product_id)
@@ -295,17 +234,37 @@ def save_review_summary(
             review_count = EXCLUDED.review_count,
             updated_at = CURRENT_TIMESTAMP
         """,
-        (
-            product_id,
-            product_name,
-            summary,
-            used_provider,
-            review_count
-        )
+        (product_id, product_name, summary, used_provider, review_count)
     )
-
     conn.commit()
     cursor.close()
+
+
+def process_order_message(message_value):
+    """Runs inside a worker thread: analyze one order end-to-end and save it.
+    Opens its own DB connection, since psycopg2 connections are not safe to
+    share across concurrently executing threads."""
+    original = message_value.get('original_message', str(message_value))
+    print("Analyzing order using provider routing...")
+    start_time = time.monotonic()
+    try:
+        prompt = build_order_prompt(original)
+        analysis, used_provider = analyze_with_model(prompt)
+        duration = time.monotonic() - start_time
+
+        print(f"Analysis: {analysis}")
+        print(f"Provider used: {used_provider}")
+
+        conn = get_db_connection()
+        try:
+            save_result(conn, original, analysis, duration, used_provider)
+        finally:
+            conn.close()
+
+        print("Order analysis saved to PostgreSQL")
+    except Exception as msg_error:
+        print(f"Failed to process order message after all providers: {msg_error}")
+    print("-" * 50)
 
 
 def process_review_message(conn, review_message):
@@ -315,16 +274,10 @@ def process_review_message(conn, review_message):
     print(f"Processing reviews for: {product_name}")
 
     if not product_id or not product_name:
-        raise ValueError(
-            "Review message is missing product_id or product_name"
-        )
+        raise ValueError("Review message is missing product_id or product_name")
 
     reviews = get_product_reviews(conn, product_id)
-
-    print(
-        f"Found {len(reviews)} reviews "
-        f"for product: {product_name}"
-    )
+    print(f"Found {len(reviews)} reviews for product: {product_name}")
 
     new_review = (
         review_message.get("customer_name"),
@@ -336,38 +289,21 @@ def process_review_message(conn, review_message):
         reviews.append(new_review)
         print("Added the new review to the summary input")
 
-    prompt = build_review_summary_prompt(
-        product_name,
-        reviews
-    )
-
+    prompt = build_review_summary_prompt(product_name, reviews)
     print("Generating AI review summary...")
 
-    start_time = time.time()
-
+    start_time = time.monotonic()
     try:
         summary, used_provider = analyze_with_model(prompt)
     except Exception:
-        print(
-            "AI review summary skipped - "
-            "no available AI provider."
-        )
+        print("AI review summary skipped - no available AI provider.")
         return
-
-    duration = time.time() - start_time
+    duration = time.monotonic() - start_time
 
     print(f"Summary generated using: {used_provider}")
     print(f"Generation took {duration:.2f} seconds")
 
-    save_review_summary(
-        conn,
-        product_id,
-        product_name,
-        summary,
-        used_provider,
-        len(reviews)
-    )
-
+    save_review_summary(conn, product_id, product_name, summary, used_provider, len(reviews))
     print("AI review summary saved to PostgreSQL")
 
 
@@ -376,7 +312,6 @@ def generate_initial_review_summaries(conn):
 
     for attempt in range(5):
         cursor = conn.cursor()
-
         cursor.execute(
             """
             SELECT DISTINCT product_id, product_name
@@ -384,69 +319,38 @@ def generate_initial_review_summaries(conn):
             ORDER BY product_id
             """
         )
-
         products = cursor.fetchall()
         cursor.close()
 
         if products:
             break
 
-        print(
-            f"No product reviews found yet. "
-            f"Waiting for seed... ({attempt + 1}/5)"
-        )
+        print(f"No product reviews found yet. Waiting for seed... ({attempt + 1}/5)")
         time.sleep(3)
 
     if not products:
-        print(
-            "No existing product reviews found. "
-            "Skipping initial AI summaries."
-        )
+        print("No existing product reviews found. Skipping initial AI summaries.")
         return
 
-    print(
-        f"Found {len(products)} products "
-        "with existing reviews."
-    )
+    print(f"Found {len(products)} products with existing reviews.")
 
     for product_id, product_name in products:
         reviews = get_product_reviews(conn, product_id)
-
         if not reviews:
             continue
 
-        print(
-            f"Generating initial review summary for: "
-            f"{product_name} ({len(reviews)} reviews)"
-        )
-
-        prompt = build_review_summary_prompt(
-            product_name,
-            reviews
-        )
+        print(f"Generating initial review summary for: {product_name} ({len(reviews)} reviews)")
+        prompt = build_review_summary_prompt(product_name, reviews)
 
         try:
             summary, used_provider = analyze_with_model(prompt)
         except Exception:
-            print(
-                "Initial AI summaries stopped - "
-                "no AI provider is currently available."
-            )
+            print("Initial AI summaries stopped - no AI provider is currently available.")
             break
 
-        save_review_summary(
-            conn,
-            product_id,
-            product_name,
-            summary,
-            used_provider,
-            len(reviews)
-        )
+        save_review_summary(conn, product_id, product_name, summary, used_provider, len(reviews))
+        print(f"Initial AI summary saved for {product_name} using {used_provider}")
 
-        print(
-            f"Initial AI summary saved for "
-            f"{product_name} using {used_provider}"
-        )
 
 consumer = KafkaConsumer(
     *TOPIC_NAMES,
@@ -457,15 +361,12 @@ consumer = KafkaConsumer(
     value_deserializer=lambda x: json.loads(x.decode('utf-8'))
 )
 
-print(
-    "AI Agent started, listening to topics: "
-    + ", ".join(TOPIC_NAMES)
-)
-print(
-    "Provider routing order: "
-    + " -> ".join(PROVIDER_ROUTING_ORDER)
-)
+print("AI Agent started, listening to topics: " + ", ".join(TOPIC_NAMES))
+print("Provider routing order: " + " -> ".join(PROVIDER_ROUTING_ORDER))
+print(f"Order-processing concurrency: {MAX_WORKERS} worker threads")
 print("Waiting for messages...")
+
+executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 try:
     conn = get_db_connection()
@@ -473,7 +374,6 @@ try:
 
     print("Checking for existing product reviews...")
     generate_initial_review_summaries(conn)
-
     print("Initial review summary check completed.")
     print("Waiting for new Kafka messages...")
 
@@ -481,56 +381,31 @@ try:
         print(f"Received message: {message.value}")
         topic_name = message.topic
         print(f"Message topic: {topic_name}")
-        try:
-            if topic_name == "output-topic":
-                print("Processing an order message...")
 
-                original = message.value.get(
-                    'original_message',
-                    str(message.value)
-                )
+        if topic_name == "output-topic":
+            # Hand off to a worker thread immediately and go back to reading
+            # the next message right away, instead of blocking here.
+            executor.submit(process_order_message, message.value)
 
-                print("Analyzing order using provider routing...")
-                start_time = time.time()
+        elif topic_name == "customer-review":
+            print("Processing a review message...")
+            try:
+                process_review_message(conn, message.value)
+            except Exception as msg_error:
+                print(f"Failed to process review message: {msg_error}")
+            print("-" * 50)
 
-                prompt = build_order_prompt(original)
-                analysis, used_provider = analyze_with_model(prompt)
+        else:
+            print(f"Unsupported topic: {topic_name}")
+            print("-" * 50)
 
-                duration = time.time() - start_time
-
-                print(f"Analysis: {analysis}")
-                print(f"Provider used: {used_provider}")
-
-                save_result(
-                    conn,
-                    original,
-                    analysis,
-                    duration,
-                    used_provider
-                )
-
-                print("Order analysis saved to PostgreSQL")
-
-            elif topic_name == "customer-review":
-                print("Processing a review message...")
-
-                process_review_message(
-                    conn,
-                    message.value
-                )
-
-            else:
-                print(f"Unsupported topic: {topic_name}")
-
-        except Exception as msg_error:
-            print(f"Failed to process message: {msg_error}")
-
-        print("-" * 50)
 except KeyboardInterrupt:
     print("\nAgent stopped")
 except Exception as e:
     print(f"Error: {e}")
 finally:
+    print("Waiting for in-flight order analyses to finish...")
+    executor.shutdown(wait=True)
     consumer.close()
     if 'conn' in locals():
         conn.close()
